@@ -1,14 +1,6 @@
 import axios from 'axios';
 import type { ApiError } from '@/types/orchard';
-
-function getCultivatorId(): string | null {
-  if (typeof window === 'undefined') return null;
-  return (
-    localStorage.getItem('orchard_cultivator_id') ||
-    process.env.NEXT_PUBLIC_CULTIVATOR_ID ||
-    null
-  );
-}
+import { getCultivatorId } from '@/lib/auth';
 
 export const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
@@ -28,6 +20,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
         window.location.href = '/unauthorized';
+        return new Promise(() => {});
       }
     }
     const message: string =
