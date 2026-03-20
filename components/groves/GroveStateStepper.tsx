@@ -10,11 +10,12 @@ import type { GroveState } from '@/types/orchard';
 
 const STEPS = ['Preparing', 'Planting', 'Growing', 'Flourishing'];
 
-const STATE_STEP: Record<Exclude<GroveState, 'BLIGHTED'>, number> = {
+const STATE_STEP: Partial<Record<GroveState, number>> = {
   PREPARING: 0,
   PLANTING: 1,
   GROWING: 2,
   FLOURISHING: 3,
+  DORMANT: 3,
 };
 
 interface GroveStateStepperProps {
@@ -27,7 +28,7 @@ export default function GroveStateStepper({
   connecting,
 }: GroveStateStepperProps) {
   const isBlighted = currentState === 'BLIGHTED';
-  const activeStep = isBlighted ? 2 : STATE_STEP[currentState];
+  const activeStep = isBlighted ? 2 : (STATE_STEP[currentState] ?? 0);
 
   return (
     <Box>
