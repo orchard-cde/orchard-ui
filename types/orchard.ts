@@ -3,6 +3,9 @@ export type GroveState =
   | 'PLANTING'
   | 'GROWING'
   | 'FLOURISHING'
+  | 'DORMANT'
+  | 'CLEARING'
+  | 'CLEARED'
   | 'BLIGHTED';
 
 export interface SeedlingInfo {
@@ -39,8 +42,10 @@ export interface GroveResponse {
 
 export interface CultivatorResponse {
   id: string;
-  name: string;
+  username: string;
   email: string;
+  displayName: string;
+  avatarUrl: string | null;
 }
 
 export interface CreateGroveRequest {

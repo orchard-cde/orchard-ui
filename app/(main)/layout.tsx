@@ -16,7 +16,7 @@ export default function MainLayout({
 
   useEffect(() => {
     getCurrentCultivator()
-      .then((c) => setCultivatorName(c.name))
+      .then((c) => setCultivatorName(c.displayName || c.username))
       .catch(() => {
         // Fallback to "Cultivator" — do NOT redirect on layout /api/me failure
       });
