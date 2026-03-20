@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { GroveState } from '@/types/orchard';
+import { getCultivatorId } from '@/lib/auth';
 
 export interface GroveEvent {
   newState: GroveState;
@@ -18,15 +19,6 @@ export interface UseGroveEventsResult {
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
-function getCultivatorId(): string {
-  if (typeof window === 'undefined') return '';
-  return (
-    localStorage.getItem('orchard_cultivator_id') ||
-    process.env.NEXT_PUBLIC_CULTIVATOR_ID ||
-    ''
-  );
-}
-
 export function useGroveEvents(groveId: string): UseGroveEventsResult {
   const [event, setEvent] = useState<GroveEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +34,7 @@ export function useGroveEvents(groveId: string): UseGroveEventsResult {
 
       const cultivatorId = getCultivatorId();
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const url = `${baseUrl}/api/groves/${groveId}/events${cultivatorId ? `?cultivatorId=${cultivatorId}` : ''}`;
+      const url = `${baseUrl}/api/groves/${encodeURIComponent(groveId)}/events${cultivatorId ? `?cultivatorId=${encodeURIComponent(cultivatorId)}` : ''}`;
 
       setConnecting(true);
       const es = new EventSource(url);
@@ -65,6 +57,7 @@ export function useGroveEvents(groveId: string): UseGroveEventsResult {
       });
 
       es.onopen = () => {
+        retriesRef.current = 0;
         setConnecting(false);
         setError(null);
       };

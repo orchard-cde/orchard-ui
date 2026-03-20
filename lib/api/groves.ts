@@ -25,6 +25,8 @@ export async function clearGrove(id: string): Promise<void> {
   await apiClient.delete(`/api/groves/${id}`);
 }
 
+// responseType: 'text' must stay — without it Axios parses the response as JSON.
+// The <string> generic alone does not enforce this at runtime.
 export async function getSshConfig(id: string): Promise<string> {
   const response = await apiClient.get<string>(
     `/api/groves/${id}/ssh-config`,
