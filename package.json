@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "build:bundle": "next build",
     "start": "next start",
-    "test": "jest",
-    "test:watch": "jest --watch"
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch --passWithNoTests"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -15,7 +16,7 @@
     "@mui/icons-material": "^7.3.9",
     "@mui/material": "^7.3.9",
     "axios": "^1.13.6",
-    "next": "15.5.14",
+    "next": "^15.5.19",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },

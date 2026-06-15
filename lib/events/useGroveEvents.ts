@@ -33,7 +33,7 @@ export function useGroveEvents(groveId: string): UseGroveEventsResult {
       if (cancelled) return;
 
       const cultivatorId = getCultivatorId();
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
       const url = `${baseUrl}/api/groves/${encodeURIComponent(groveId)}/events${cultivatorId ? `?cultivatorId=${encodeURIComponent(cultivatorId)}` : ''}`;
 
       setConnecting(true);
