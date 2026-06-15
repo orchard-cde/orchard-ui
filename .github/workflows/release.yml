@@ -44,6 +44,9 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=high
 
+      - name: Test
+        run: npm test
+
       - name: Build static bundle
         env:
           NEXT_PUBLIC_API_URL: ''
