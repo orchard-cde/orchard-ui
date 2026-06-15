@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish UI bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Derive version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify package.json version matches tag
+        run: |
+          pkg_version=$(node -p "require('./package.json').version")
+          if [ "$pkg_version" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::package.json version ($pkg_version) does not match tag (${{ steps.version.outputs.version }})"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Build static bundle
+        env:
+          NEXT_PUBLIC_API_URL: ''
+        run: npm run build:bundle
+
+      - name: Smoke-check bundle
+        run: test -f out/index.html
+
+      - name: Package bundle
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          tar czf orchard-ui-bundle-${VERSION}.tar.gz -C out .
+          sha256sum orchard-ui-bundle-${VERSION}.tar.gz > checksums-sha256.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v3
+        with:
+          generate_release_notes: true
+          files: |
+            orchard-ui-bundle-*.tar.gz
+            checksums-sha256.txt
