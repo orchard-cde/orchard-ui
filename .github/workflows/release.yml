@@ -14,57 +14,61 @@ concurrency:
 
 jobs:
   release:
-    name: Build and publish UI bundle
-    runs-on: ubuntu-latest
+    name: Build and publish native binary (linux/${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+
+      - name: Derive version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version matches gradle.properties
+        run: |
+          gradle_version=$(grep '^version=' gradle.properties | cut -d= -f2)
+          if [ "$gradle_version" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::gradle.properties version ($gradle_version) does not match tag (${{ steps.version.outputs.version }})"
+            exit 1
+          fi
+
+      - name: Set up GraalVM JDK 25
+        uses: graalvm/setup-graalvm@6f3fa030c4b8f77c1f554a860f593a654538fa38  # v1
+        with:
+          java-version: '25'
+          distribution: 'graalvm-community'
 
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: 'lts/*'
           cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Derive version from tag
-        id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      # Builds the :frontend export and compiles the backend (with the UI embedded) to a native image.
+      - name: Build native binary
+        run: ./gradlew :backend:nativeCompile
 
-      - name: Verify package.json version matches tag
-        run: |
-          pkg_version=$(node -p "require('./package.json').version")
-          if [ "$pkg_version" != "${{ steps.version.outputs.version }}" ]; then
-            echo "::error::package.json version ($pkg_version) does not match tag (${{ steps.version.outputs.version }})"
-            exit 1
-          fi
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Audit dependencies
-        run: npm audit --audit-level=high
-
-      - name: Test
-        run: npm test
-
-      - name: Build static bundle
-        env:
-          NEXT_PUBLIC_API_URL: ''
-        run: npm run build:bundle
-
-      - name: Smoke-check bundle
-        run: test -f out/index.html
-
-      - name: Package bundle
+      - name: Package binary
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          tar czf orchard-ui-bundle-${VERSION}.tar.gz -C out .
-          sha256sum orchard-ui-bundle-${VERSION}.tar.gz > checksums-sha256.txt
+          ARCH=${{ matrix.arch }}
+          ASSET="orchard-ui-backend-${VERSION}-linux-${ARCH}"
+          cp backend/build/native/nativeCompile/orchard-ui-backend "$ASSET"
+          sha256sum "$ASSET" > "${ASSET}.sha256"
 
-      - name: Create GitHub Release
+      - name: Publish to GitHub Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v3
         with:
           generate_release_notes: true
           files: |
-            orchard-ui-bundle-*.tar.gz
-            checksums-sha256.txt
+            orchard-ui-backend-*-linux-${{ matrix.arch }}
+            orchard-ui-backend-*-linux-${{ matrix.arch }}.sha256
