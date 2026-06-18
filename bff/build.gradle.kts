@@ -38,3 +38,20 @@ graalvmNative {
         }
     }
 }
+
+// Run the Next.js static export from the repo root (produces orchard-ui/out).
+val buildUi by tasks.registering(Exec::class) {
+    workingDir = rootDir.parentFile          // orchard-ui/
+    commandLine("npm", "run", "build:bundle")
+    inputs.dir("${rootDir.parentFile}/app")
+    inputs.file("${rootDir.parentFile}/package.json")
+    outputs.dir("${rootDir.parentFile}/out")
+}
+
+// Copy the export onto the classpath under static/. Distributables depend on a fresh build;
+// tests/dev rely on whatever out/ exists (kept fast — no implicit npm on every test run).
+tasks.named<ProcessResources>("processResources") {
+    from("${rootDir.parentFile}/out") { into("static") }
+}
+tasks.named("bootJar") { dependsOn(buildUi) }
+tasks.named("nativeCompile") { dependsOn(buildUi) }
