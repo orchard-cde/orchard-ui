@@ -80,40 +80,42 @@ graph LR
 
 ## 3. Component placement and build
 
-The BFF is a self-contained Gradle project under `bff/` in the `orchard-ui` repo, leaving the
-existing Node tooling at the repository root untouched.
+orchard-ui is a Gradle **multi-project**; the BFF is the `:backend` module, alongside the
+`:frontend` module (the Next.js app). A single `./gradlew` at the repo root drives both.
 
 ```
 orchard-ui/
-  app/  components/  lib/  types/      # existing Next.js app (unchanged)
-  package.json                         # Node build: `npm run build:bundle` → out/
-  out/                                 # static export (build artifact)
-  bff/
-    build.gradle.kts                   # Spring Boot 4.x, Java 25 GraalVM — mirrors orchard
-    settings.gradle.kts
-    gradlew, gradle/                   # Gradle wrapper
-    src/main/java/dev/orchard/ui/bff/  # namespace consistent with dev.orchard.*
-    src/main/resources/
-      application.yml
-      static/                          # UI assets embedded here at build time
+  settings.gradle.kts                      # include(":frontend", ":backend")
+  build.gradle.kts  gradle.properties      # root: shared config + canonical version
+  gradlew, gradle/                         # Gradle wrapper (repo root)
+  frontend/                                # :frontend — Next.js app + node build wrapper
+    build.gradle.kts                       #   npm ci + `next build` → frontend/out (cached)
+    app/ components/ lib/ types/  package.json  next.config.ts
+  backend/                                 # :backend — Spring Boot 4.x, Java 25 GraalVM
+    build.gradle.kts
+    src/main/java/dev/orchard/ui/backend/  # package dev.orchard.ui.backend
+    src/main/resources/application.yml
 ```
 
-**Build integration.** The Gradle build embeds the UI into the BFF artifact:
+**Build integration.** `:backend` declares a real Gradle dependency on `:frontend`'s build output:
 
-1. A Gradle task runs the Node build (`npm ci && npm run build:bundle`) to produce `out/`.
-2. The static export is copied into the BFF's `static/` resources.
-3. `./gradlew :bff:bootJar` (or `nativeCompile`) produces one self-contained artifact with the UI
-   inside it.
+1. `:frontend`'s Gradle build runs the Node build (`npm ci` + `next build`) with declared
+   inputs/outputs, producing `frontend/out` — cached, so `next build` only re-runs when frontend
+   sources change.
+2. `:backend`'s `processResources` consumes that output through the inter-module dependency and
+   stages it under `static/` on the runtime classpath — no hardcoded paths.
+3. `./gradlew :backend:bootJar` (or `nativeCompile`) produces one self-contained artifact with the
+   UI embedded — the native binary `orchard-ui-backend`.
 
-The Node build remains the source of truth for the UI; Gradle orchestrates and packages. The BFF's
-Spring Boot, dependency-management, and GraalVM native-image plugin versions track orchard core so
-the two services stay on the same line.
+Because the dependency is wired through Gradle, every backend task that needs the UI (`bootJar`,
+`nativeCompile`, `bootRun`, and tests) builds the cached frontend first. `:backend`'s Spring Boot,
+dependency-management, and GraalVM native-image plugin versions track orchard core.
 
-> **Decision — `bff/` subdirectory vs. root-level Gradle.** A subdirectory keeps the Node
-> toolchain at the repo root pristine and walls JVM concerns into one place; the release workflow
-> and existing layout are undisturbed. The alternative (Gradle at root, Next demoted to
-> `frontend/`) reads as more "unified" but churns the repo and the release pipeline for no
-> functional gain. The subdirectory wins.
+> **Decision — Gradle multi-project (`:frontend` + `:backend`).** One root build with two modules
+> gives a single `./gradlew` entrypoint and a real producer/consumer dependency (the backend
+> consumes the frontend's output), so the UI embed is correct and cached without hardcoded paths,
+> while each toolchain stays idiomatic inside its module. (This supersedes the earlier
+> `bff/`-standalone-subdirectory layout.)
 
 ---
 
@@ -230,7 +232,7 @@ packaging question, deferred — see [§9](#9-out-of-scope--open-questions).
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Distribution format | **Decided: GraalVM native binary** (`orchard-ui-bff`) | The BFF is built as a standalone native binary, independently deployable and consumed by orchard `dev-server start` (download + spawn as a sibling to `orchard-server`). Whether to *publish* it as a release asset and retire the static-export tarball remains open |
+| Distribution format | **Decided: GraalVM native binary** (`orchard-ui-backend`) | The `:backend` module builds a standalone native binary, independently deployable and consumed by orchard `dev-server start` (download + spawn as a sibling to `orchard-server`). **Published per architecture (linux/amd64 + linux/arm64) as the release artifact; the static-export tarball is retired.** |
 | Actual auth/session/token-relay implementation | Deferred | The seam is built; the logic is future work (see §7) |
 | WebSocket proxying | Not needed today | UI uses SSE; revisit if WS is adopted |
 | Spring Cloud Gateway ↔ Spring Boot 4.x compatibility | Must verify | Determines primary vs. fallback proxy (see §4) |
