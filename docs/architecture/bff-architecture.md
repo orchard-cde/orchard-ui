@@ -128,16 +128,18 @@ The proxy must satisfy two transport shapes the UI actually uses:
   (`text/event-stream`, long-lived). The proxy must **stream** the response — a buffer-and-forward
   proxy breaks SSE.
 
-> **Decision — Spring Cloud Gateway Server WebMVC (primary), hand-rolled streaming proxy
-> (fallback).** The servlet (WebMVC) variant of Spring Cloud Gateway matches orchard core's
-> `spring-boot-starter-webmvc` stack (no reactive runtime), and handles SSE streaming and
-> header/status passthrough without bespoke code. **This requires verifying that the Spring Cloud
-> release train supports the Spring Boot 4.x line in use** — Spring Boot 4.1 is new, and gateway
-> compatibility must be confirmed at implementation time. If alignment is not yet available, the
-> documented fallback is a servlet streaming proxy: a catch-all `@RequestMapping("/api/**")` using
-> `RestClient` whose response body is piped into a `StreamingResponseBody`, which preserves SSE
-> streaming and is trivially native-image friendly. A naive buffered `RestClient`/`RestTemplate`
-> proxy is explicitly rejected because it breaks SSE.
+> **Decision — hand-rolled servlet streaming proxy (primary); Spring Cloud Gateway Server WebMVC
+> (documented alternative).** Because the BFF ships as a GraalVM **native binary** (see
+> [§3](#3-component-placement-and-build)), native-image cleanliness is the deciding criterion. The
+> primary proxy is a catch-all `@RequestMapping("/api/**")` controller using `RestClient` whose
+> upstream response `InputStream` is piped into a `StreamingResponseBody` — it preserves SSE
+> streaming, passes request headers (incl. `X-Cultivator-Id`) and response status through, and is
+> trivially native-image friendly (no reflection-heavy machinery). The servlet variant of Spring
+> Cloud Gateway (`spring-cloud-starter-gateway-server-webmvc`, BOM `2025.1.2`, which supports
+> Spring Boot 4.1.0) is a viable alternative — it gives SSE streaming and header/status passthrough
+> by default — but it is reflection-heavy and needs native reachability metadata, so it is held in
+> reserve, not the default. A naive buffered `RestClient`/`RestTemplate` proxy is explicitly
+> rejected because it breaks SSE.
 
 No WebSocket proxying is required today: the UI uses SSE, not WebSocket, for grove events. (orchard
 core pulls in the websocket starter for other reasons, but the UI does not open a WS connection.)
@@ -147,11 +149,23 @@ WebSocket passthrough is a future concern, noted in [§7](#7-growth-path).
 
 ## 5. SPA fallback and static serving
 
-The BFF serves the embedded static export and applies SPA-fallback routing: any request that is
-**not** `/api/**`, **not** `/actuator/**`, and **not** a static asset is forwarded to
-`/index.html`, letting the React client router resolve the route. This is the same logic that the
-deferred `trellis` `SpaFallbackController` would have carried — it now lives in the BFF instead, so
-core never learns about UI routes.
+The BFF serves the embedded static export through a `PathResourceResolver` ported from trellis's
+`SpaResourceConfig`. Naive "forward everything to `/index.html`" is **wrong** for this export: the
+root `out/index.html` is a Next.js *error* shell (`__next_error__`), so serving it for deep links
+breaks them — the exact bug issue #9 calls out. Instead the resolver resolves each request in order:
+
+1. `api`, `actuator`, `ws` prefixes → `null` (404) — never given the SPA shell.
+2. A path with a file extension (`/_next/...`, `/favicon.ico`) → the real asset, or 404 if missing.
+3. An extensionless route → the prerendered `<route>/index.html` (e.g. `groves/index.html`).
+4. Else the dynamic-route placeholder `<parent>/_/index.html` (e.g. `groves/_/index.html` for
+   `/groves/{uuid}`, emitted by the UI's `generateStaticParams` `_` sentinel).
+5. Else the root `index.html` shell as a last resort.
+
+An extensionless route is **never** served as a raw directory resource — in the native image,
+classpath directories report `isReadable()==true` and would otherwise be served as
+`application/octet-stream`. This is the same routing knowledge the deferred `trellis`
+`SpaResourceConfig` carried; co-locating it with the UI build (in this repo) is the point of issue
+#9 — core never learns about UI routes, and the Next-static-export specifics live next to the UI.
 
 ---
 
@@ -216,7 +230,7 @@ packaging question, deferred — see [§9](#9-out-of-scope--open-questions).
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Release artifact / packaging (jar vs. Docker image; retiring the tarball) | Deferred | Dev-server runs the BFF from the local build for now; publishing format is a later decision |
+| Distribution format | **Decided: GraalVM native binary** (`orchard-ui-bff`) | The BFF is built as a standalone native binary, independently deployable and consumed by orchard `dev-server start` (download + spawn as a sibling to `orchard-server`). Whether to *publish* it as a release asset and retire the static-export tarball remains open |
 | Actual auth/session/token-relay implementation | Deferred | The seam is built; the logic is future work (see §7) |
 | WebSocket proxying | Not needed today | UI uses SSE; revisit if WS is adopted |
 | Spring Cloud Gateway ↔ Spring Boot 4.x compatibility | Must verify | Determines primary vs. fallback proxy (see §4) |
