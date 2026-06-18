@@ -1,4 +1,4 @@
-package dev.orchard.ui.bff.dev;
+package dev.orchard.ui.backend.dev;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,12 +15,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 
-import dev.orchard.ui.bff.proxy.ProxyRequests;
+import dev.orchard.ui.backend.proxy.ProxyRequests;
 
 /**
  * Dev-profile only: proxies all non-/api, non-/actuator routes to a running {@code next dev} so
  * HMR works. /api/** is still owned by
- * {@link dev.orchard.ui.bff.proxy.ApiProxyController}; the static SpaResourceConfig is
+ * {@link dev.orchard.ui.backend.proxy.ApiProxyController}; the static SpaResourceConfig is
  * {@code @Profile("!dev")} and inactive here.
  */
 @RestController

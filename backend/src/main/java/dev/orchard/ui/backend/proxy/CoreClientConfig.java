@@ -1,4 +1,4 @@
-package dev.orchard.ui.bff.proxy;
+package dev.orchard.ui.backend.proxy;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

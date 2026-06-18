@@ -32,7 +32,7 @@ tasks.named<Test>("test") {
 graalvmNative {
     binaries {
         named("main") {
-            imageName.set("orchard-ui-bff")
+            imageName.set("orchard-ui-backend")
             buildArgs.add("--no-fallback")
         }
     }

@@ -1,4 +1,4 @@
-package dev.orchard.ui.bff.proxy;
+package dev.orchard.ui.backend.proxy;
 
 import java.net.URI;
 

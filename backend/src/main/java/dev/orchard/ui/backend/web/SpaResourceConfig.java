@@ -1,4 +1,4 @@
-package dev.orchard.ui.bff.web;
+package dev.orchard.ui.backend.web;
 
 import java.io.IOException;
 import org.springframework.context.annotation.Configuration;

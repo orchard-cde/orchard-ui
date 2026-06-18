@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: orchard-ui-bff
+    name: orchard-ui-backend
 
 orchard:
   core:

@@ -1,4 +1,4 @@
-package dev.orchard.ui.bff.proxy;
+package dev.orchard.ui.backend.proxy;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -23,14 +23,14 @@ import org.springframework.test.context.DynamicPropertySource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    classes = dev.orchard.ui.bff.BffApplication.class)
+    classes = dev.orchard.ui.backend.BackendApplication.class)
 class ApiProxyIntegrationTest {
 
     static ConfigurableApplicationContext stubCore;
     static int stubPort;
 
     @LocalServerPort
-    int bffPort;
+    int backendPort;
 
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -59,7 +59,7 @@ class ApiProxyIntegrationTest {
     @Test
     void upstreamUnauthorizedStatusIsPassedThrough() throws Exception {
         var resp = client.send(
-            HttpRequest.newBuilder(URI.create("http://localhost:" + bffPort + "/api/secure")).GET().build(),
+            HttpRequest.newBuilder(URI.create("http://localhost:" + backendPort + "/api/secure")).GET().build(),
             HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode()).isEqualTo(401);
         assertThat(resp.body()).isEqualTo("nope");
@@ -68,7 +68,7 @@ class ApiProxyIntegrationTest {
     @Test
     void customRequestHeaderIsForwarded() throws Exception {
         var resp = client.send(
-            HttpRequest.newBuilder(URI.create("http://localhost:" + bffPort + "/api/echo-header"))
+            HttpRequest.newBuilder(URI.create("http://localhost:" + backendPort + "/api/echo-header"))
                 .header("X-Cultivator-Id", "cultivator-42").GET().build(),
             HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode()).isEqualTo(200);
@@ -78,7 +78,7 @@ class ApiProxyIntegrationTest {
     @Test
     void sseEventsArriveIncrementally() throws Exception {
         var resp = client.send(
-            HttpRequest.newBuilder(URI.create("http://localhost:" + bffPort + "/api/groves/abc/events"))
+            HttpRequest.newBuilder(URI.create("http://localhost:" + backendPort + "/api/groves/abc/events"))
                 .header("Accept", MediaType.TEXT_EVENT_STREAM_VALUE).GET().build(),
             HttpResponse.BodyHandlers.ofLines());
 

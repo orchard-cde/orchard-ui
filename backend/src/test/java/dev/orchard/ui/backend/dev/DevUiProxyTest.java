@@ -1,4 +1,4 @@
-package dev.orchard.ui.bff.dev;
+package dev.orchard.ui.backend.dev;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    classes = dev.orchard.ui.bff.BffApplication.class)
+    classes = dev.orchard.ui.backend.BackendApplication.class)
 @ActiveProfiles("dev")
 class DevUiProxyTest {
 
@@ -30,7 +30,7 @@ class DevUiProxyTest {
     static int nextPort;
 
     @LocalServerPort
-    int bffPort;
+    int backendPort;
 
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -59,7 +59,7 @@ class DevUiProxyTest {
     @Test
     void nonApiRouteIsProxiedToNextDev() throws Exception {
         var resp = client.send(
-            HttpRequest.newBuilder(URI.create("http://localhost:" + bffPort + "/groves")).GET().build(),
+            HttpRequest.newBuilder(URI.create("http://localhost:" + backendPort + "/groves")).GET().build(),
             HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode()).isEqualTo(200);
         assertThat(resp.body()).isEqualTo("next-dev-home");
@@ -68,7 +68,7 @@ class DevUiProxyTest {
     @Test
     void actuatorHealthIsNotShadowedByProxy() throws Exception {
         var resp = client.send(
-            HttpRequest.newBuilder(URI.create("http://localhost:" + bffPort + "/actuator/health")).GET().build(),
+            HttpRequest.newBuilder(URI.create("http://localhost:" + backendPort + "/actuator/health")).GET().build(),
             HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode()).isEqualTo(200);
         // Actuator health returns JSON with "status" key — not the stub next-dev response
