@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# bff (Spring Boot BFF)
+/bff/build/
+/bff/.gradle/
+/bff/src/main/resources/static/
