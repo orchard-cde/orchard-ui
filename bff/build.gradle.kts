@@ -52,6 +52,7 @@ val buildUi by tasks.registering(Exec::class) {
 // tests/dev rely on whatever out/ exists (kept fast — no implicit npm on every test run).
 tasks.named<ProcessResources>("processResources") {
     from("${rootDir.parentFile}/out") { into("static") }
+    dependsOn(buildUi)
 }
 tasks.named("bootJar") { dependsOn(buildUi) }
 tasks.named("nativeCompile") { dependsOn(buildUi) }
