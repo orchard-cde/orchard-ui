@@ -48,11 +48,23 @@ val buildUi by tasks.registering(Exec::class) {
     outputs.dir("${rootDir.parentFile}/out")
 }
 
-// Copy the export onto the classpath under static/. Distributables depend on a fresh build;
-// tests/dev rely on whatever out/ exists (kept fast — no implicit npm on every test run).
-tasks.named<ProcessResources>("processResources") {
-    from("${rootDir.parentFile}/out") { into("static") }
+// Stage the Next.js export into an isolated build directory under static/.
+// This task is only in the task graph for distributables (bootJar / nativeCompile);
+// it is intentionally NOT wired into processResources so that `./gradlew test`
+// never schedules an npm build.
+val copyUiToClasspath by tasks.registering(Copy::class) {
     dependsOn(buildUi)
+    from("${rootDir.parentFile}/out") { into("static") }
+    into(layout.buildDirectory.dir("ui-classpath"))
 }
-tasks.named("bootJar") { dependsOn(buildUi) }
-tasks.named("nativeCompile") { dependsOn(buildUi) }
+
+// Wire the staged UI into the Spring Boot jar and the native image.
+// Using `from` here satisfies Gradle 9's implicit-dependency validation:
+// the declared input/output relationship is explicit, not inferred.
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    dependsOn(copyUiToClasspath)
+    from(copyUiToClasspath.map { it.destinationDir }) {
+        into("BOOT-INF/classes")
+    }
+}
+tasks.named("nativeCompile") { dependsOn(copyUiToClasspath) }
