@@ -9,13 +9,13 @@ import java.util.Set;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Reverse-proxies every method on /api/** to orchard core, streaming the response so SSE
@@ -34,17 +34,17 @@ public class ApiProxyController {
             "proxy-authenticate", "proxy-authorization", "te", "trailer", "upgrade");
 
     private final RestClient coreRestClient;
+    private final String coreBaseUrl;
 
-    public ApiProxyController(RestClient coreRestClient) {
+    public ApiProxyController(RestClient coreRestClient,
+                              @Value("${orchard.core.base-url}") String coreBaseUrl) {
         this.coreRestClient = coreRestClient;
+        this.coreBaseUrl = coreBaseUrl;
     }
 
     @RequestMapping("/api/**")
     public void proxy(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        URI target = UriComponentsBuilder.fromUriString(request.getRequestURI())
-            .query(request.getQueryString())
-            .build(true)
-            .toUri();
+        URI target = ProxyRequests.upstreamUri(coreBaseUrl, request);
 
         byte[] body = StreamUtils.copyToByteArray(request.getInputStream());
 

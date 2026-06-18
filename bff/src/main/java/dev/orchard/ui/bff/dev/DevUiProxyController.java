@@ -14,7 +14,8 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.util.UriComponentsBuilder;
+
+import dev.orchard.ui.bff.proxy.ProxyRequests;
 
 /**
  * Dev-profile only: proxies all non-/api, non-/actuator routes to a running {@code next dev} so
@@ -27,10 +28,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class DevUiProxyController {
 
     private final RestClient nextClient;
+    private final String nextUrl;
 
     public DevUiProxyController(@Value("${orchard.dev.next-url}") String nextUrl) {
+        this.nextUrl = nextUrl;
         this.nextClient = RestClient.builder()
-            .baseUrl(nextUrl)
             .requestFactory(new JdkClientHttpRequestFactory())
             .build();
     }
@@ -38,10 +40,7 @@ public class DevUiProxyController {
     // Everything except /api/** and /actuator/** (those are matched by more specific handlers).
     @RequestMapping("/**")
     public void proxyToNext(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        URI target = UriComponentsBuilder.fromUriString(request.getRequestURI())
-            .query(request.getQueryString())
-            .build(true)
-            .toUri();
+        URI target = ProxyRequests.upstreamUri(nextUrl, request);
 
         nextClient.method(HttpMethod.valueOf(request.getMethod()))
             .uri(target)
