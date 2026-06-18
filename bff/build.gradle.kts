@@ -63,4 +63,5 @@ tasks.named<ProcessResources>("processResources") {
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     dependsOn(buildUi)
 }
+tasks.named("bootRun") { dependsOn(buildUi) }
 tasks.named("nativeCompile") { dependsOn(buildUi) }
