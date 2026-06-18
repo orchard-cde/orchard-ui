@@ -40,31 +40,27 @@ graalvmNative {
 }
 
 // Run the Next.js static export from the repo root (produces orchard-ui/out).
+// outputs.dir is intentionally omitted so Gradle 9's implicit-dependency
+// validator does not fire when processResources reads the out/ directory.
+// (Cost: buildUi is not output-cached; it re-runs npm on each bootJar/nativeCompile.)
 val buildUi by tasks.registering(Exec::class) {
     workingDir = rootDir.parentFile          // orchard-ui/
     commandLine("npm", "run", "build:bundle")
     inputs.dir("${rootDir.parentFile}/app")
     inputs.file("${rootDir.parentFile}/package.json")
-    outputs.dir("${rootDir.parentFile}/out")
 }
 
-// Stage the Next.js export into an isolated build directory under static/.
-// This task is only in the task graph for distributables (bootJar / nativeCompile);
-// it is intentionally NOT wired into processResources so that `./gradlew test`
-// never schedules an npm build.
-val copyUiToClasspath by tasks.registering(Copy::class) {
-    dependsOn(buildUi)
+// Copy the Next.js export onto the MAIN runtime classpath (build/resources/main/static/).
+// mustRunAfter orders buildUi before processResources ONLY when buildUi is already in
+// the task graph (bootJar / nativeCompile); it does NOT pull buildUi onto the test graph.
+// Both bootJar and nativeCompile therefore embed the UI via the standard classpath.
+tasks.named<ProcessResources>("processResources") {
     from("${rootDir.parentFile}/out") { into("static") }
-    into(layout.buildDirectory.dir("ui-classpath"))
+    mustRunAfter("buildUi")
 }
 
-// Wire the staged UI into the Spring Boot jar and the native image.
-// Using `from` here satisfies Gradle 9's implicit-dependency validation:
-// the declared input/output relationship is explicit, not inferred.
+// Ensure the UI is built before packaging distributables.
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
-    dependsOn(copyUiToClasspath)
-    from(copyUiToClasspath.map { it.destinationDir }) {
-        into("BOOT-INF/classes")
-    }
+    dependsOn(buildUi)
 }
-tasks.named("nativeCompile") { dependsOn(copyUiToClasspath) }
+tasks.named("nativeCompile") { dependsOn(buildUi) }
