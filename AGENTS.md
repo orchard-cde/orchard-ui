@@ -52,3 +52,23 @@ The `out/` tarball is consumed by orchard's trellis (Spring Boot native image) a
 `docs/superpowers/specs/2026-06-15-orchard-ui-release-bundle-design.md` → "Contract surface" section.
 
 Before changing anything in `lib/api/apiClient.ts`, the contract for environment variables, or the shape of `out/`, re-read that section and the orchard side of the integration.
+
+## BFF (Backend-for-Frontend)
+
+`bff/` is a standalone Spring Boot (servlet/WebMVC) service that serves the static export and
+reverse-proxies `/api/**` (incl. SSE) to orchard core. It ships as a GraalVM native binary
+(`orchard-ui-bff`) consumed by orchard `dev-server start`. See
+`docs/architecture/bff-architecture.md` and the spec under `docs/superpowers/specs/`.
+
+Build / test / run:
+
+```bash
+cd bff
+./gradlew test                 # JVM unit + integration tests
+./gradlew bootRun              # run on :8080, proxying /api to orchard.core.base-url (:8081 default)
+./gradlew nativeCompile        # produce build/native/nativeCompile/orchard-ui-bff
+```
+
+The UI is embedded from `../out` at build time (`bootJar`/`nativeCompile` run `npm run build:bundle`
+first). Configure the upstream with `ORCHARD_CORE_BASE_URL`. Dev HMR: run with `--spring.profiles.active=dev`
+and a running `next dev` (proxied via `orchard.dev.next-url`, default `http://localhost:3000`).
