@@ -27,6 +27,7 @@ dependencies {
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
+    jvmArgs("-XX:+EnableDynamicAgentLoading")
 }
 
 graalvmNative {
