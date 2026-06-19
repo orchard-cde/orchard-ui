@@ -11,8 +11,12 @@ val npmInstall by tasks.registering(Exec::class) {
     description = "Installs npm dependencies (npm ci)."
     inputs.file("package.json")
     inputs.file("package-lock.json")
-    outputs.dir("node_modules")
+    // Stamp (not node_modules) as the output: avoids fingerprinting the huge dependency tree on
+    // every up-to-date check, and is written only on success so a failed/partial install re-runs.
+    val stamp = layout.buildDirectory.file("npm-install.stamp")
+    outputs.file(stamp)
     commandLine("npm", "ci")
+    doLast { stamp.get().asFile.apply { parentFile.mkdirs(); writeText("ok") } }
 }
 
 // `next build` static export -> frontend/out. Declared inputs/outputs give up-to-date checking.
@@ -39,7 +43,11 @@ val npmTest by tasks.registering(Exec::class) {
     inputs.dir("lib")
     inputs.dir("types")
     inputs.files("package.json", "package-lock.json", "jest.config.ts", "jest.setup.ts")
+    // Stamp output so jest is up-to-date (skipped) when no frontend sources changed.
+    val stamp = layout.buildDirectory.file("npm-test.stamp")
+    outputs.file(stamp)
     commandLine("npm", "test")
+    doLast { stamp.get().asFile.apply { parentFile.mkdirs(); writeText("ok") } }
 }
 
 // Wire into the standard lifecycle so `./gradlew build` builds and tests the frontend.

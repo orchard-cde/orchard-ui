@@ -32,11 +32,17 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Verify version matches gradle.properties
+      - name: Verify version matches tag
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
           gradle_version=$(grep '^version=' gradle.properties | cut -d= -f2)
-          if [ "$gradle_version" != "${{ steps.version.outputs.version }}" ]; then
-            echo "::error::gradle.properties version ($gradle_version) does not match tag (${{ steps.version.outputs.version }})"
+          if [ "$gradle_version" != "$VERSION" ]; then
+            echo "::error::gradle.properties version ($gradle_version) does not match tag ($VERSION)"
+            exit 1
+          fi
+          pkg_version=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' frontend/package.json | head -1)
+          if [ "$pkg_version" != "$VERSION" ]; then
+            echo "::error::frontend/package.json version ($pkg_version) does not match tag ($VERSION)"
             exit 1
           fi
 
@@ -53,14 +59,22 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      # Builds the :frontend export and compiles the backend (with the UI embedded) to a native image.
-      - name: Build native binary
-        run: ./gradlew :backend:nativeCompile
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+      # Runs both test suites (frontend jest + backend JUnit) and the frontend export, then
+      # compiles the backend (with the UI embedded) to a native image.
+      - name: Build, test, and native-compile
+        run: ./gradlew build :backend:nativeCompile
+
+      - name: Smoke-check embedded UI
+        run: test -f frontend/out/index.html
 
       - name: Package binary
         run: |
-          VERSION=${{ steps.version.outputs.version }}
-          ARCH=${{ matrix.arch }}
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
           ASSET="orchard-ui-backend-${VERSION}-linux-${ARCH}"
           cp backend/build/native/nativeCompile/orchard-ui-backend "$ASSET"
           sha256sum "$ASSET" > "${ASSET}.sha256"
@@ -68,7 +82,8 @@ jobs:
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v3
         with:
-          generate_release_notes: true
+          # Generate notes on a single matrix leg only, so the two legs don't race to overwrite them.
+          generate_release_notes: ${{ matrix.arch == 'amd64' }}
           files: |
             orchard-ui-backend-*-linux-${{ matrix.arch }}
             orchard-ui-backend-*-linux-${{ matrix.arch }}.sha256

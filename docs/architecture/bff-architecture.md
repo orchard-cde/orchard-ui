@@ -102,8 +102,9 @@ orchard-ui/
 1. `:frontend`'s Gradle build runs the Node build (`npm ci` + `next build`) with declared
    inputs/outputs, producing `frontend/out` — cached, so `next build` only re-runs when frontend
    sources change.
-2. `:backend`'s `processResources` consumes that output through the inter-module dependency and
-   stages it under `static/` on the runtime classpath — no hardcoded paths.
+2. `:backend`'s `processResources` consumes that output through the inter-module dependency
+   (`dependsOn(":frontend:npmBuild")` + `from(frontend/out)`, which tracks the content as a task
+   input) and stages it under `static/` on the runtime classpath.
 3. `./gradlew :backend:bootJar` (or `nativeCompile`) produces one self-contained artifact with the
    UI embedded — the native binary `orchard-ui-backend`.
 
