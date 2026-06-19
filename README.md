@@ -1,77 +1,83 @@
 # orchard-ui
 
-The Next.js web UI for [Orchard](https://github.com/orchard-cde/orchard), a Cloud Development Environment. Brand name: **Canopy**.
+The web UI for [Orchard](https://github.com/orchard-cde/orchard), a Cloud Development Environment. Brand name: **Canopy**.
+
+This repo is a **Gradle multi-project** with two modules:
+
+| Module | Path | What it is |
+|--------|------|-----------|
+| `:frontend` | `frontend/` | The Next.js static-export SPA (Canopy). Pure HTML/CSS/JS, no Node runtime at serve time. |
+| `:backend` | `backend/` | A Spring Boot service that serves the frontend and reverse-proxies `/api/**` (incl. SSE) to orchard core. Ships as a GraalVM native binary (`orchard-ui-backend`). |
+
+A single `./gradlew` at the repo root drives both. The backend embeds the frontend's static export at build time, so the published artifact is one self-contained native binary.
 
 ## Getting started
 
-Requires Node.js (latest LTS) and a running orchard API on `http://localhost:8080`. See the orchard repo for instructions on starting the API (`trowel dev-server start` after building).
+**Frontend-only (fast UI iteration):** run the SPA against a local orchard API on `http://localhost:8080`.
 
 ```bash
+cd frontend
 npm install
-npm run dev
+npm run dev      # http://localhost:3000
 ```
 
-Open <http://localhost:3000>. The dev server runs against the API specified by `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8080`); copy `.env.local.example` to `.env.local` to override.
+Override the API origin by copying `frontend/.env.local.example` to `frontend/.env.local` (sets `NEXT_PUBLIC_API_URL`).
 
-## Building the release bundle
+**Full stack (UI served + proxied by the backend):** run the backend, which builds the frontend, serves it, and proxies the API to orchard core.
 
 ```bash
-npm run build:bundle
+./gradlew :backend:bootRun        # serves on :8080, proxies /api/** to orchard.core.base-url
 ```
 
-Produces a fully static `out/` directory (Next.js `output: 'export'`). This is what gets packaged into a release tarball and consumed by orchard's trellis as a baked-in classpath resource. The bundle has no Node.js runtime requirements — it's pure HTML/CSS/JS.
-
-Verify locally with:
+Point it at core with `ORCHARD_CORE_BASE_URL` (default `http://localhost:8081`). For hot-reload, run the backend with the `dev` profile and a running `next dev`:
 
 ```bash
-cd out && npx serve
+./gradlew :backend:bootRun --args='--spring.profiles.active=dev'   # proxies non-/api to next dev (:3000)
 ```
 
-Hard-refresh on dynamic routes like `/groves/<id>` will 404 from `serve` — that's expected. The orchard-side SPA fallback (deferred to a separate implementation) catches those at runtime and serves root `/index.html`.
+## Building
+
+```bash
+./gradlew build                   # builds + tests both modules (frontend: next build + jest; backend: tests + jar)
+./gradlew :backend:nativeCompile  # produces the native binary: backend/build/native/nativeCompile/orchard-ui-backend
+```
+
+The frontend build is cached — `next build` only re-runs when frontend sources change. The native build requires a GraalVM JDK 25 (e.g. `25.0.2-graalce`).
 
 ## Releasing
 
-Tag the commit on `main` you want to release as `v{X.Y.Z}` (matching `package.json`'s `version` field exactly — no `v` prefix on the package.json value, no pre-release suffixes for now):
+Tag the commit on `main` as `v{X.Y.Z}` (matching the `version` in root `gradle.properties` exactly — no `v` prefix on the value, no pre-release suffixes):
 
 ```bash
 git tag v0.1.0
 git push --tags
 ```
 
-GitHub Actions builds the static bundle (with `NEXT_PUBLIC_API_URL=''` so API calls are relative) and publishes:
+GitHub Actions builds the `:backend` native binary on each target architecture and publishes them as Release assets:
 
-- `https://github.com/orchard-cde/orchard-ui/releases/download/v{VERSION}/orchard-ui-bundle-{VERSION}.tar.gz`
-- `https://github.com/orchard-cde/orchard-ui/releases/download/v{VERSION}/checksums-sha256.txt`
+- `orchard-ui-backend-{VERSION}-linux-amd64`
+- `orchard-ui-backend-{VERSION}-linux-arm64`
+- per-asset SHA-256 checksums
 
-The tarball root contains the static export directly (no `out/` wrapper). The orchard repo pins exact versions via `orchardUiBundleVersion=X.Y.Z` and downloads at native-image build time.
-
-### Troubleshooting releases
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| Workflow doesn't trigger on tag push | Tag missing the `v` prefix (e.g., pushed `0.1.0`) | Re-tag as `v0.1.0` and push |
-| `Verify package.json version matches tag` step fails | `package.json#version` ≠ tag | Bump `package.json`, delete the tag locally and remote, re-tag, push: `git tag -d v{X} && git push --delete origin v{X} && {edit package.json} && git commit && git tag v{X} && git push --tags` |
-| `npm ci` fails | Transient npm registry issue | Re-run the job. If reproducible, verify `package-lock.json` is committed and in sync |
-| `npm audit` fails | New high/critical CVE in a transitive dep | Run `npm audit fix` locally, commit, re-tag |
-| `npm run build:bundle` fails | TypeScript error or new dynamic route missing `generateStaticParams` | Reproduce locally (`npm run build:bundle`), fix, re-tag |
-| `test -f out/index.html` fails | Static export emitted nothing at root — likely a Next config regression | Investigate locally; do not retag until reproducible-and-fixed |
-| `softprops/action-gh-release` fails on asset upload | Usually transient GH API issue | Re-run the job; the action updates existing releases idempotently |
+The binary is self-contained (the UI is embedded) and is what orchard's `dev-server start` downloads and runs. **The static-export tarball is no longer published** — the binary is the release artifact.
 
 ### Bad release recovery
 
-If a release publishes successfully but the bundle is broken (wrong API URL baked in, missing assets, JS errors), **publish a patch release** (e.g., `v0.1.1`). Do **NOT** delete the broken GitHub Release — orchard pins exact versions, so an orphaned pin would 404 forever for any consumer that already pulled `v0.1.0`. Forward-fix is the only safe path once a release has any consumers.
+If a release publishes but the binary is broken, **publish a patch release** (e.g. `v0.1.1`). Do **not** delete a published GitHub Release — consumers may pin exact versions, and an orphaned pin would 404 forever. Forward-fix is the only safe path once a release has consumers.
 
 ## Tests
 
 ```bash
-npm test
+./gradlew build            # runs both suites
+./gradlew :frontend:check  # jest only
+./gradlew :backend:test    # backend only
 ```
 
-Jest + `@testing-library/react`. The test suite is currently small; see `TODOS.md` for known testing gaps.
+Frontend: Jest + `@testing-library/react`. Backend: JUnit 5. See `TODOS.md` for known testing gaps.
 
 ## Architecture notes
 
-This UI builds as a **Next.js static export** so its release artifact can be baked into the orchard native binary. That means a permanent set of constraints — see `AGENTS.md` for the full list before adding new features.
+The frontend builds as a **Next.js static export** so it can be embedded into the backend's native binary. That imposes a permanent set of constraints (no server actions, route handlers, middleware, etc.) — see `AGENTS.md` for the full list before adding features, and `docs/architecture/` for the backend/serving design.
 
 ## License
 
