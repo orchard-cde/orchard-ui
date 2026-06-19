@@ -1,0 +1,18 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: orchard-ui-backend
+
+orchard:
+  core:
+    # Upstream orchard core. The BFF is the browser origin (8080); core is fronted behind it.
+    # Default avoids a self-proxy loop when both run locally. dev-server owns final ports (F4).
+    base-url: ${ORCHARD_CORE_BASE_URL:http://localhost:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
