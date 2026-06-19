@@ -13,8 +13,9 @@
 /frontend/out/
 /frontend/next-env.d.ts
 
-# gradle / backend
+# gradle
 /.gradle/
+/frontend/build/
 /backend/.gradle/
 /backend/build/
 /backend/src/main/resources/static/
