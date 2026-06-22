@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -18,8 +18,12 @@ import { useGroveEvents } from '@/lib/events/useGroveEvents';
 import type { GroveResponse, GroveState, ApiError } from '@/types/orchard';
 
 export default function GroveDetailView() {
-  const params = useParams();
-  const groveId = params.id as string;
+  // In a Next.js static export, the [id] dynamic route is emitted only as the
+  // "_" placeholder, so useParams().id resolves to "_" rather than the real
+  // segment. Read the id from the live pathname instead so deep links and the
+  // "Open" navigation resolve the actual grove id.
+  const pathname = usePathname();
+  const groveId = pathname.split('/').filter(Boolean).pop() ?? '';
 
   const [grove, setGrove] = useState<GroveResponse | null>(null);
   const [loading, setLoading] = useState(true);
