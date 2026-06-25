@@ -5,8 +5,7 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import CheckIcon from '@mui/icons-material/Check';
+import { Copy, Check } from 'lucide-react';
 
 interface SshConfigBlockProps {
   config: string;
@@ -27,7 +26,7 @@ export default function SshConfigBlock({ config }: SshConfigBlockProps) {
         <Typography variant="subtitle2">SSH Config</Typography>
         <Button
           size="small"
-          startIcon={copied ? <CheckIcon /> : <ContentCopyIcon />}
+          startIcon={copied ? <Check size={18} /> : <Copy size={18} />}
           onClick={handleCopy}
           color={copied ? 'success' : 'primary'}
         >

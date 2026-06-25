@@ -1,0 +1,12 @@
+{
+  "radius": {
+    "DEFAULT": { "value": "8px" }
+  },
+  "_meta": {
+    "source": "website tailwind.config.ts — borderRadius.DEFAULT = 8px is the only spacing-family value any surface defines today.",
+    "tbd": {
+      "spacing": "The spacing scale currently inherits Tailwind defaults; not yet pinned as explicit tokens.",
+      "radius": "Only DEFAULT (8px) is defined; sm / lg / full not yet decided."
+    }
+  }
+}

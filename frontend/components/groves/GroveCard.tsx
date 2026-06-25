@@ -12,7 +12,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogActions from '@mui/material/DialogActions';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import StatusChip from './StatusChip';
 import type { GroveResponse } from '@/types/orchard';
@@ -67,7 +67,7 @@ export default function GroveCard({ grove, onDelete }: GroveCardProps) {
             onClick={() => setDialogOpen(true)}
             aria-label="delete grove"
           >
-            <DeleteIcon />
+            <Trash2 size={20} />
           </IconButton>
         </CardActions>
       </Card>

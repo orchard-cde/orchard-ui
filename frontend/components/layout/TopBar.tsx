@@ -3,7 +3,7 @@
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import ForestIcon from '@mui/icons-material/Forest';
+import { TreePine } from 'lucide-react';
 
 export const DRAWER_WIDTH = 240;
 
@@ -18,7 +18,7 @@ export default function TopBar({ cultivatorName }: TopBarProps) {
       sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
     >
       <Toolbar sx={{ gap: 1 }}>
-        <ForestIcon />
+        <TreePine />
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           Canopy
         </Typography>
