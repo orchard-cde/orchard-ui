@@ -1,0 +1,24 @@
+{
+  "typography": {
+    "fontFamily": {
+      "sans": { "value": "var(--font-geist-sans), system-ui, sans-serif" },
+      "mono": { "value": "var(--font-geist-mono), ui-monospace, monospace" }
+    },
+    "fontSize": {
+      "xs":   { "value": "0.75rem" },
+      "sm":   { "value": "0.875rem" },
+      "base": { "value": "1rem" },
+      "lg":   { "value": "1.125rem" },
+      "xl":   { "value": "1.25rem" },
+      "2xl":  { "value": "1.5rem" },
+      "3xl":  { "value": "1.875rem" },
+      "4xl":  { "value": "2.25rem" }
+    }
+  },
+  "_meta": {
+    "tbd": {
+      "fontWeight": "Weight scale not yet pinned as tokens.",
+      "lineHeight": "Line-height scale not yet pinned as tokens."
+    }
+  }
+}

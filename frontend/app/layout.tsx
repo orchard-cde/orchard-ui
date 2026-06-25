@@ -1,5 +1,12 @@
 import type { Metadata } from 'next';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
 import ThemeRegistry from '@/components/ThemeRegistry';
+
+// GeistSans/GeistMono define the --font-geist-sans / --font-geist-mono CSS
+// variables the design tokens reference (see lib/design/tokens/typography.json).
+// The `geist` package self-hosts the font files, so the static-export build
+// never fetches from Google Fonts at build time (works offline / in CI).
 
 export const metadata: Metadata = {
   title: 'Canopy — Orchard',
@@ -12,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body>
         <ThemeRegistry>{children}</ThemeRegistry>
       </body>

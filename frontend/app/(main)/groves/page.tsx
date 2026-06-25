@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import AddIcon from '@mui/icons-material/Add';
+import { Plus } from 'lucide-react';
 import Link from 'next/link';
+import Button from '@/components/common/Button';
 import GroveCard from '@/components/groves/GroveCard';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import ErrorAlert from '@/components/common/ErrorAlert';
@@ -45,8 +45,8 @@ export default function GrovesPage() {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">Groves</Typography>
         <Button
-          variant="contained"
-          startIcon={<AddIcon />}
+          variant="primary"
+          startIcon={<Plus size={18} />}
           component={Link}
           href="/groves/new"
         >
@@ -62,7 +62,7 @@ export default function GrovesPage() {
           <Typography variant="h6" color="text.secondary" gutterBottom>
             No groves yet — plant your first grove
           </Typography>
-          <Button variant="contained" component={Link} href="/groves/new">
+          <Button variant="primary" component={Link} href="/groves/new">
             Plant Grove
           </Button>
         </Box>
