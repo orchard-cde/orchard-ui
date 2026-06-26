@@ -1,5 +1,7 @@
 # orchard-ui
 
+[![GitLab mirror](https://img.shields.io/badge/mirror-gitlab.com%2Forchard--cde-FC6D26?logo=gitlab)](https://gitlab.com/orchard-cde/orchard-ui)
+
 The web UI for [Orchard](https://github.com/orchard-cde/orchard), a Cloud Development Environment. Brand name: **Canopy**.
 
 This repo is a **Gradle multi-project** with two modules:
