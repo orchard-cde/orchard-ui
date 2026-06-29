@@ -14,6 +14,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/material": "^7.3.9",
+    "@orchard-cde/design": "https://github.com/orchard-cde/design/archive/refs/tags/v0.1.0.tar.gz",
     "axios": "^1.13.6",
     "geist": "^1.7.2",
     "lucide-react": "^1.16.0",

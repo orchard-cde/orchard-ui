@@ -3,7 +3,7 @@
 import MuiButton from '@mui/material/Button';
 import type { ButtonProps as MuiButtonProps } from '@mui/material/Button';
 import type { SxProps, Theme } from '@mui/material/styles';
-import typography from '@/lib/design/tokens/typography.json';
+import typography from '@orchard-cde/design/tokens/typography';
 
 // Shared Button per @orchard-cde/design components/button.md. A thin wrapper over
 // MUI Button that maps the design-system variant/size vocabulary onto MUI props +
@@ -41,7 +41,7 @@ const MUI_SIZE: Record<ButtonSize, MuiButtonProps['size']> = {
 };
 
 // Heights from the spec; font sizes consume the design tokens (font-size.sm /
-// .base / .lg) so they stay in sync with lib/design/tokens/typography.json.
+// .base / .lg) so they stay in sync with @orchard-cde/design.
 const fontSize = typography.typography.fontSize;
 const SIZE_SX: Record<ButtonSize, SxProps<Theme>> = {
   sm: { minHeight: 32, fontSize: fontSize.sm.value },
