@@ -31,6 +31,6 @@
     "@types/react-dom": "^19",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
-    "typescript": "^5"
+    "typescript": "^6"
   }
 }
