@@ -94,3 +94,44 @@ The published artifact is the `orchard-ui-backend` **native binary** (per arch),
 `dev-server start`. The earlier static-export *tarball* release is retired. Before changing
 `frontend/lib/api/apiClient.ts`, the `NEXT_PUBLIC_API_URL` contract, or the shape of `frontend/out/`,
 re-read `docs/architecture/bff-architecture.md` and the orchard-side integration.
+
+## Release process
+
+Releases are handled by two GitHub Actions workflows:
+
+1. **Create Release** (`.github/workflows/create-release.yml`) — manual `workflow_dispatch`.
+   Takes a semver like `0.2.1`, bumps `gradle.properties` and `frontend/package.json` to match,
+   commits, and pushes a `v0.2.1` tag. Run this first.
+
+   ⚠ This workflow is **broken** — the repo's branch protection rules block its direct push to
+   `main`. It should be removed or replaced. Do not use it.
+
+2. **Release** (`.github/workflows/release.yml`) — triggered automatically on any `v*` tag push.
+   Builds native binaries for `linux-amd64`, `linux-arm64`, and `macos-arm64`, then creates a
+   GitHub Release with the binaries + SHA256 checksums. Auto-generates release notes from commits
+   since the last tag.
+
+   The workflow validates that the tag version matches both `gradle.properties` and
+   `frontend/package.json`. If they don't match, the build fails.
+
+**Do NOT** `gh release create` manually — always push a tag and let the Release workflow handle it.
+
+### Manual release procedure
+
+Since the Create Release workflow can't push past branch protection:
+
+```bash
+# 1. Bump versions locally
+VERSION=0.2.1
+sed -i "s/^version=.*/version=${VERSION}/" gradle.properties
+sed -i "0,/\"version\": \"[^\"]*\"/{s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/}" frontend/package.json
+
+# 2. Commit, push, tag
+git add gradle.properties frontend/package.json
+git commit -m "chore: bump version to ${VERSION}"
+git push origin main
+git tag -a "v${VERSION}" -m "v${VERSION}"
+git push origin "v${VERSION}"
+
+# 3. The Release workflow builds and publishes the native binaries
+```
