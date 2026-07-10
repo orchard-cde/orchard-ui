@@ -33,6 +33,7 @@ export default function GroveDetailView() {
   const [sshError, setSshError] = useState<string | null>(null);
   const [sshFetched, setSshFetched] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const { event: sseEvent, error: sseError, connecting } = useGroveEvents(groveId);
 
@@ -49,8 +50,17 @@ export default function GroveDetailView() {
   useEffect(() => {
     if (sseEvent) {
       setCurrentState(sseEvent.newState);
+      setActionLoading(false);
     }
   }, [sseEvent]);
+
+  useEffect(() => {
+    if (!actionLoading) return;
+    const timer = setTimeout(() => {
+      setActionLoading(false);
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [actionLoading]);
 
   useEffect(() => {
     const ipAddress = grove?.seedling?.ipAddress;
@@ -64,12 +74,11 @@ export default function GroveDetailView() {
 
   const handleStop = async () => {
     setActionLoading(true);
+    setActionError(null);
     try {
-      const updated = await stopGrove(groveId);
-      setCurrentState(updated.state);
+      await stopGrove(groveId);
     } catch (e) {
-      setError((e as ApiError).message);
-    } finally {
+      setActionError((e as ApiError).message);
       setActionLoading(false);
     }
   };
@@ -129,6 +138,7 @@ export default function GroveDetailView() {
         <>
           <Divider sx={{ my: 3 }} />
           <Typography variant="h6" gutterBottom>Actions</Typography>
+          {actionError && <ErrorAlert message={actionError} />}
           <Button
             variant="outlined"
             color="warning"
