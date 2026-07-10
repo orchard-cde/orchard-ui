@@ -17,8 +17,8 @@
 /.gradle/
 /frontend/build/
 /backend/.gradle/
-/backend/build/
 /backend/src/main/resources/static/
+**/build/
 
 # misc
 .DS_Store
@@ -42,3 +42,6 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+docs/superpowers
+docs/handoffs
