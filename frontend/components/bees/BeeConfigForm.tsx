@@ -21,7 +21,6 @@ interface BeeConfigFormProps {
 export default function BeeConfigForm({ beeType, values, onChange }: BeeConfigFormProps) {
   const schema = BEE_TYPE_SCHEMAS[beeType];
   const [kvPairs, setKvPairs] = useState<Array<{ key: string; value: string }>>([]);
-  const [formValues, setFormValues] = useState<Record<string, string>>(values);
 
   if (beeType === 'CUSTOM') {
     const handleAddPair = () => {
@@ -79,12 +78,6 @@ export default function BeeConfigForm({ beeType, values, onChange }: BeeConfigFo
     );
   }
 
-  const handleFieldChange = (key: string, value: string) => {
-    const newValues = { ...formValues, [key]: value };
-    setFormValues(newValues);
-    onChange(newValues);
-  };
-
   return (
     <Stack spacing={2}>
       {schema.fields.map((field) => {
@@ -95,8 +88,8 @@ export default function BeeConfigForm({ beeType, values, onChange }: BeeConfigFo
               label={field.label}
               select
               size="small"
-              value={formValues[field.key] ?? field.defaultValue ?? ''}
-              onChange={(e) => handleFieldChange(field.key, e.target.value)}
+              value={values[field.key] ?? field.defaultValue ?? ''}
+              onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
             >
               {field.options?.map((opt) => (
                 <MenuItem key={opt} value={opt}>{opt}</MenuItem>
@@ -113,8 +106,8 @@ export default function BeeConfigForm({ beeType, values, onChange }: BeeConfigFo
               multiline
               minRows={3}
               size="small"
-              value={formValues[field.key] ?? ''}
-              onChange={(e) => handleFieldChange(field.key, e.target.value)}
+              value={values[field.key] ?? ''}
+              onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
             />
           );
         }
@@ -125,8 +118,8 @@ export default function BeeConfigForm({ beeType, values, onChange }: BeeConfigFo
             label={field.label}
             type={field.type === 'number' ? 'number' : 'text'}
             size="small"
-            value={formValues[field.key] ?? ''}
-            onChange={(e) => handleFieldChange(field.key, e.target.value)}
+            value={values[field.key] ?? ''}
+            onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
           />
         );
       })}

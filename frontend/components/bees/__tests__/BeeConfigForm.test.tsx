@@ -1,6 +1,16 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import BeeConfigForm from '../BeeConfigForm';
+
+function ControlledWrapper({ initialValues, onChangeCapture }: { initialValues: Record<string, string>; onChangeCapture: (values: Record<string, string>) => void }) {
+  const [values, setValues] = useState(initialValues);
+  const handleChange = (newValues: Record<string, string>) => {
+    setValues(newValues);
+    onChangeCapture(newValues);
+  };
+  return <BeeConfigForm beeType="CLAUDE_CODE" values={values} onChange={handleChange} />;
+}
 
 test('renders schema fields for CLAUDE_CODE', () => {
   render(
@@ -25,7 +35,7 @@ test('calls onChange when a field value changes', async () => {
   const onChange = jest.fn();
   const user = userEvent.setup();
   render(
-    <BeeConfigForm beeType="CLAUDE_CODE" values={{}} onChange={onChange} />
+    <ControlledWrapper initialValues={{}} onChangeCapture={onChange} />
   );
 
   await user.type(screen.getByLabelText('Allowed Tools'), 'bash,read');
