@@ -52,7 +52,7 @@ export default function BeeCard({ bee, onAction }: BeeCardProps) {
   const canSmoke = bee.state === 'BUZZING' || bee.state === 'POLLINATING';
   const canRemove = bee.state === 'SMOKED' || bee.state === 'HIBERNATING';
 
-  const handleAction = async (action: () => Promise<void>) => {
+  const handleAction = async (action: () => Promise<unknown>) => {
     setLoading(true);
     setError(null);
     try {
