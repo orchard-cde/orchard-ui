@@ -6,6 +6,7 @@ import CardContent from '@mui/material/CardContent';
 import CardActions from '@mui/material/CardActions';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
+import Alert from '@mui/material/Alert';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -45,47 +46,35 @@ interface BeeCardProps {
 export default function BeeCard({ bee, onAction }: BeeCardProps) {
   const [confirmAction, setConfirmAction] = useState<'smoke' | 'remove' | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const canWake = bee.state === 'HIBERNATING' || bee.state === 'SMOKED';
   const canSmoke = bee.state === 'BUZZING' || bee.state === 'POLLINATING';
   const canRemove = bee.state === 'SMOKED' || bee.state === 'HIBERNATING';
 
-  const handleWake = async () => {
+  const handleAction = async (action: () => Promise<void>) => {
     setLoading(true);
+    setError(null);
     try {
-      await wakeBee(bee.groveId, bee.id);
+      await action();
       onAction();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSmoke = async () => {
-    setLoading(true);
-    try {
-      await smokeBee(bee.groveId, bee.id);
-      onAction();
+    } catch (e) {
+      setError((e as { message: string }).message);
     } finally {
       setLoading(false);
       setConfirmAction(null);
     }
   };
 
-  const handleRemove = async () => {
-    setLoading(true);
-    try {
-      await removeBee(bee.groveId, bee.id);
-      onAction();
-    } finally {
-      setLoading(false);
-      setConfirmAction(null);
-    }
-  };
+  const handleWake = () => handleAction(() => wakeBee(bee.groveId, bee.id));
+  const handleSmoke = () => handleAction(() => smokeBee(bee.groveId, bee.id));
+  const handleRemove = () => handleAction(() => removeBee(bee.groveId, bee.id));
 
   return (
     <>
       <Card variant="outlined">
         <CardContent>
+          {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
           <Box display="flex" alignItems="center" gap={1} mb={1}>
             {ICON_MAP[bee.type]}
             <Typography variant="subtitle1">{TYPE_LABELS[bee.type]}</Typography>

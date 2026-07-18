@@ -19,6 +19,7 @@ interface BeeConfigFormProps {
 }
 
 export default function BeeConfigForm({ beeType, values, onChange }: BeeConfigFormProps) {
+  // TODO: Fix state hydration for CUSTOM type (kvPairs) when values prop changes.
   const schema = BEE_TYPE_SCHEMAS[beeType];
   const [kvPairs, setKvPairs] = useState<Array<{ key: string; value: string }>>([]);
 

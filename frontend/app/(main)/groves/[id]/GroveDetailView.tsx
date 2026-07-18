@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
@@ -169,14 +168,14 @@ export default function GroveDetailView() {
           <Divider sx={{ my: 3 }} />
           <Typography variant="h6" gutterBottom>Actions</Typography>
           {actionError && <ErrorAlert message={actionError} />}
-          <Button
-            variant="outlined"
-            color="warning"
+          <CommonButton
+            variant="danger"
+            size="sm"
             onClick={handleStop}
             disabled={actionLoading}
           >
             {actionLoading ? 'Stopping…' : 'Stop Grove'}
-          </Button>
+          </CommonButton>
 
           <Divider sx={{ my: 3 }} />
           <Typography variant="h6" gutterBottom>Swarm</Typography>
