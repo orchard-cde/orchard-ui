@@ -57,3 +57,41 @@ export interface CreateGroveRequest {
 export interface ApiError {
   message: string;
 }
+
+export type BeeState =
+  | 'HATCHING'
+  | 'HIBERNATING'
+  | 'BUZZING'
+  | 'POLLINATING'
+  | 'SMOKED';
+
+export type BeeType =
+  | 'CLAUDE_CODE'
+  | 'GEMINI'
+  | 'CODEX'
+  | 'KIRO'
+  | 'OPENCODE'
+  | 'CUSTOM';
+
+export interface BeeResponse {
+  id: string;
+  groveId: string;
+  type: BeeType;
+  state: BeeState;
+  processId: string | null;
+  hatchedAt: string;
+  startedAt: string | null;
+  stoppedAt: string | null;
+}
+
+export interface SwarmStatusResponse {
+  groveId: string;
+  totalBees: number;
+  byState: Record<string, number>;
+}
+
+export interface CreateBeeRequest {
+  beeType: BeeType;
+  version?: string;
+  configOverrides?: Record<string, string>;
+}
