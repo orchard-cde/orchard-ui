@@ -38,7 +38,11 @@ export default function AttachBeeDialog({ open, onClose, groveId }: AttachBeeDia
       });
       onClose();
     } catch (e) {
-      setError((e as { message: string }).message);
+      setError(
+        e && typeof e === 'object' && 'message' in e && typeof (e as any).message === 'string'
+          ? (e as any).message
+          : 'An unexpected error occurred'
+      );
     } finally {
       setLoading(false);
     }
@@ -56,35 +60,39 @@ export default function AttachBeeDialog({ open, onClose, groveId }: AttachBeeDia
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Attach Bee</DialogTitle>
-      <DialogContent>
-        <Box display="flex" flexDirection="column" gap={3} sx={{ pt: 1 }}>
-          {error && <Alert severity="error">{error}</Alert>}
-          <BeeTypeSelector
-            selectedType={selectedType}
-            onSelect={setSelectedType}
-            version={version}
-            onVersionChange={setVersion}
-          />
-          {selectedType && (
-            <BeeConfigForm
-              beeType={selectedType}
-              values={configValues}
-              onChange={setConfigValues}
-            />
-          )}
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button variant="ghost" onClick={handleClose} disabled={loading}>Cancel</Button>
-        <Button
-          variant="primary"
-          onClick={handleAttach}
-          disabled={!selectedType || loading}
-        >
-          {loading ? 'Attaching…' : 'Attach'}
-        </Button>
-      </DialogActions>
+      {open && (
+        <>
+          <DialogTitle>Attach Bee</DialogTitle>
+          <DialogContent>
+            <Box display="flex" flexDirection="column" gap={3} sx={{ pt: 1 }}>
+              {error && <Alert severity="error">{error}</Alert>}
+              <BeeTypeSelector
+                selectedType={selectedType}
+                onSelect={setSelectedType}
+                version={version}
+                onVersionChange={setVersion}
+              />
+              {selectedType && (
+                <BeeConfigForm
+                  beeType={selectedType}
+                  values={configValues}
+                  onChange={setConfigValues}
+                />
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button variant="ghost" onClick={handleClose} disabled={loading}>Cancel</Button>
+            <Button
+              variant="primary"
+              onClick={handleAttach}
+              disabled={!selectedType || loading}
+            >
+              {loading ? 'Attaching…' : 'Attach'}
+            </Button>
+          </DialogActions>
+        </>
+      )}
     </Dialog>
   );
 }

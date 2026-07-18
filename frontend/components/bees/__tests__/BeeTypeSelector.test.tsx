@@ -29,8 +29,23 @@ test('calls onSelect when a type is clicked', async () => {
     />
   );
 
+  fireEvent.click(screen.getByText('OpenCode'));
+  expect(onSelect).toHaveBeenCalledWith('OPENCODE');
+});
+
+test('does not call onSelect for unsupported types', () => {
+  const onSelect = jest.fn();
+  render(
+    <BeeTypeSelector
+      selectedType={null}
+      onSelect={onSelect}
+      version=""
+      onVersionChange={jest.fn()}
+    />
+  );
+
   fireEvent.click(screen.getByText('Claude Code'));
-  expect(onSelect).toHaveBeenCalledWith('CLAUDE_CODE');
+  expect(onSelect).not.toHaveBeenCalled();
 });
 
 test('renders version input and calls onVersionChange', async () => {

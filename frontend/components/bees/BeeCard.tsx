@@ -17,7 +17,7 @@ import { Bot, Sparkles, Terminal, Code, Settings } from 'lucide-react';
 import Button from '@/components/common/Button';
 import BeeStateStepper from './BeeStateStepper';
 import BeeStatusChip from './BeeStatusChip';
-import { wakeBee, smokeBee, removeBee } from '@/lib/api/bees';
+import { wakeBee, smokeBee } from '@/lib/api/bees';
 import type { BeeResponse, BeeType } from '@/types/orchard';
 
 const ICON_MAP: Record<BeeType, React.ReactNode> = {
@@ -44,13 +44,12 @@ interface BeeCardProps {
 }
 
 export default function BeeCard({ bee, onAction }: BeeCardProps) {
-  const [confirmAction, setConfirmAction] = useState<'smoke' | 'remove' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'smoke' | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canWake = bee.state === 'HIBERNATING' || bee.state === 'SMOKED';
   const canSmoke = bee.state === 'BUZZING' || bee.state === 'POLLINATING';
-  const canRemove = bee.state === 'SMOKED' || bee.state === 'HIBERNATING';
 
   const handleAction = async (action: () => Promise<unknown>) => {
     setLoading(true);
@@ -59,7 +58,11 @@ export default function BeeCard({ bee, onAction }: BeeCardProps) {
       await action();
       onAction();
     } catch (e) {
-      setError((e as { message: string }).message);
+      setError(
+        e && typeof e === 'object' && 'message' in e && typeof (e as any).message === 'string'
+          ? (e as any).message
+          : 'An unexpected error occurred'
+      );
     } finally {
       setLoading(false);
       setConfirmAction(null);
@@ -68,7 +71,6 @@ export default function BeeCard({ bee, onAction }: BeeCardProps) {
 
   const handleWake = () => handleAction(() => wakeBee(bee.groveId, bee.id));
   const handleSmoke = () => handleAction(() => smokeBee(bee.groveId, bee.id));
-  const handleRemove = () => handleAction(() => removeBee(bee.groveId, bee.id));
 
   return (
     <>
@@ -101,28 +103,21 @@ export default function BeeCard({ bee, onAction }: BeeCardProps) {
               Stop
             </Button>
           )}
-          {canRemove && (
-            <Button variant="ghost" size="sm" onClick={() => setConfirmAction('remove')} disabled={loading}>
-              Remove
-            </Button>
-          )}
         </CardActions>
       </Card>
 
       <Dialog open={confirmAction !== null} onClose={() => setConfirmAction(null)}>
-        <DialogTitle>{confirmAction === 'smoke' ? 'Stop Bee' : 'Remove Bee'}</DialogTitle>
+        <DialogTitle>Stop Bee</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {confirmAction === 'smoke'
-              ? 'This will stop the bee. You can wake it later.'
-              : 'This will permanently remove the bee.'}
+            This will stop the bee. You can wake it later.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button variant="ghost" onClick={() => setConfirmAction(null)} disabled={loading}>Cancel</Button>
           <Button
-            variant={confirmAction === 'smoke' ? 'danger' : 'danger'}
-            onClick={confirmAction === 'smoke' ? handleSmoke : handleRemove}
+            variant="danger"
+            onClick={handleSmoke}
             disabled={loading}
           >
             {loading ? 'Working…' : 'Confirm'}

@@ -26,6 +26,10 @@ interface BeeTypeSelectorProps {
 
 const ALL_TYPES: BeeType[] = ['CLAUDE_CODE', 'GEMINI', 'CODEX', 'KIRO', 'OPENCODE', 'CUSTOM'];
 
+import FormHelperText from '@mui/material/FormHelperText';
+
+// ...
+
 export default function BeeTypeSelector({
   selectedType,
   onSelect,
@@ -41,17 +45,25 @@ export default function BeeTypeSelector({
         onChange={(_, value) => value && onSelect(value)}
         fullWidth
         size="small"
-        sx={{ mb: 2 }}
+        sx={{ mb: 1 }}
       >
         {ALL_TYPES.map((type) => {
           const config = BEE_TYPE_SCHEMAS[type];
           return (
-            <ToggleButton key={type} value={type}>
+            <ToggleButton
+              key={type}
+              value={type}
+              disabled={type !== 'OPENCODE'}
+              title={type !== 'OPENCODE' ? `${config.label} is currently unsupported server-side` : undefined}
+            >
               {ICON_MAP[config.icon]} {config.label}
             </ToggleButton>
           );
         })}
       </ToggleButtonGroup>
+      <FormHelperText sx={{ mb: 2 }}>
+        Only OpenCode is functional server-side currently. Other types are disabled.
+      </FormHelperText>
       <TextField
         label="Version"
         size="small"

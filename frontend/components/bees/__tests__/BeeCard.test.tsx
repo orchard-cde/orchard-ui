@@ -11,10 +11,9 @@ jest.mock('@/lib/api/bees', () => ({
 // ...
 
   smokeBee: jest.fn(),
-  removeBee: jest.fn(),
 }));
 
-import { wakeBee, smokeBee, removeBee } from '@/lib/api/bees';
+import { wakeBee, smokeBee } from '@/lib/api/bees';
 
 const mockBee: BeeResponse = {
   id: 'bee-1',
@@ -46,12 +45,6 @@ test('shows Wake button when HIBERNATING', () => {
   const hibernatingBee = { ...mockBee, state: 'HIBERNATING' as const };
   render(<BeeCard bee={hibernatingBee} onAction={jest.fn()} />);
   expect(screen.getByRole('button', { name: /wake/i })).toBeInTheDocument();
-});
-
-test('shows Remove button when SMOKED', () => {
-  const smokedBee = { ...mockBee, state: 'SMOKED' as const };
-  render(<BeeCard bee={smokedBee} onAction={jest.fn()} />);
-  expect(screen.getByRole('button', { name: /remove/i })).toBeInTheDocument();
 });
 
 test('calls smokeBee and onAction when Stop is clicked', async () => {
