@@ -13,6 +13,15 @@ jest.mock('@/lib/api/groves', () => ({
   getSshConfig: jest.fn(),
 }));
 
+jest.mock('@/lib/api/bees', () => ({
+  listBees: jest.fn(),
+  getSwarmStatus: jest.fn(),
+  createBee: jest.fn(),
+  wakeBee: jest.fn(),
+  smokeBee: jest.fn(),
+  removeBee: jest.fn(),
+}));
+
 jest.mock('@/lib/events/useGroveEvents', () => ({
   useGroveEvents: jest.fn(() => ({
     event: null,
@@ -21,7 +30,23 @@ jest.mock('@/lib/events/useGroveEvents', () => ({
   })),
 }));
 
+jest.mock('@/components/common/Button', () => ({
+  __esModule: true,
+  default: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+}));
+
+jest.mock('@/components/bees/BeeCard', () => ({
+  __esModule: true,
+  default: () => <div>BeeCard</div>,
+}));
+
+jest.mock('@/components/bees/AttachBeeDialog', () => ({
+  __esModule: true,
+  default: () => <div>AttachBeeDialog</div>,
+}));
+
 import { getGrove, stopGrove, getSshConfig } from '@/lib/api/groves';
+import { listBees, getSwarmStatus } from '@/lib/api/bees';
 import { useGroveEvents } from '@/lib/events/useGroveEvents';
 
 const mockGrove: GroveResponse = {
@@ -50,6 +75,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   (getGrove as jest.Mock).mockResolvedValue(mockGrove);
   (getSshConfig as jest.Mock).mockResolvedValue('ssh-ed25519 AAA...');
+  (listBees as jest.Mock).mockResolvedValue([]);
+  (getSwarmStatus as jest.Mock).mockResolvedValue({ groveId: 'test-id', totalBees: 0, byState: {} });
   (useGroveEvents as jest.Mock).mockReturnValue({
     event: null,
     error: null,
@@ -113,5 +140,61 @@ test('holds button in stopping state after successful API call until SSE confirm
   await waitFor(() => {
     expect(screen.queryByRole('button', { name: /Stop/i })).not.toBeInTheDocument();
     expect(screen.getByText('Dormant')).toBeInTheDocument();
+  });
+});
+
+test('shows swarm section when FLOURISHING', async () => {
+  (listBees as jest.Mock).mockResolvedValue([
+    {
+      id: 'bee-1',
+      groveId: 'test-id',
+      type: 'OPENCODE',
+      state: 'BUZZING',
+      processId: 'proc-1',
+      hatchedAt: '2024-06-01T00:00:00Z',
+      startedAt: '2024-06-01T00:01:00Z',
+      stoppedAt: null,
+    },
+  ]);
+  (getSwarmStatus as jest.Mock).mockResolvedValue({
+    groveId: 'test-id',
+    totalBees: 1,
+    byState: { BUZZING: 1 },
+  });
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('Swarm')).toBeInTheDocument();
+    expect(screen.getByText('BeeCard')).toBeInTheDocument();
+    expect(screen.getByText('AttachBeeDialog')).toBeInTheDocument();
+  });
+});
+
+test('hides swarm section when not FLOURISHING', async () => {
+  (getGrove as jest.Mock).mockResolvedValue({ ...mockGrove, state: 'GROWING' });
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('Test Grove')).toBeInTheDocument();
+  });
+
+  expect(screen.queryByText('Swarm')).not.toBeInTheDocument();
+});
+
+test('shows empty state when FLOURISHING but no bees', async () => {
+  (listBees as jest.Mock).mockResolvedValue([]);
+  (getSwarmStatus as jest.Mock).mockResolvedValue({
+    groveId: 'test-id',
+    totalBees: 0,
+    byState: {},
+  });
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('Swarm')).toBeInTheDocument();
+    expect(screen.getByText(/No bees attached/)).toBeInTheDocument();
   });
 });

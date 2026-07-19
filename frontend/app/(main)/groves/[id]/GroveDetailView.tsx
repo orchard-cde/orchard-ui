@@ -4,18 +4,23 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
+import Grid from '@mui/material/Grid';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
+import { Plus } from 'lucide-react';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import ErrorAlert from '@/components/common/ErrorAlert';
+import CommonButton from '@/components/common/Button';
+import BeeCard from '@/components/bees/BeeCard';
+import AttachBeeDialog from '@/components/bees/AttachBeeDialog';
 import GroveStateStepper from '@/components/groves/GroveStateStepper';
 import SshConfigBlock from '@/components/groves/SshConfigBlock';
 import StatusChip from '@/components/groves/StatusChip';
 import { getGrove, getSshConfig, stopGrove } from '@/lib/api/groves';
+import { listBees, getSwarmStatus } from '@/lib/api/bees';
 import { useGroveEvents } from '@/lib/events/useGroveEvents';
-import type { GroveResponse, GroveState, ApiError } from '@/types/orchard';
+import type { GroveResponse, GroveState, ApiError, BeeResponse, SwarmStatusResponse } from '@/types/orchard';
 
 export default function GroveDetailView() {
   // In a Next.js static export, the [id] dynamic route is emitted only as the
@@ -35,7 +40,14 @@ export default function GroveDetailView() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const [bees, setBees] = useState<BeeResponse[]>([]);
+  const [swarmStatus, setSwarmStatus] = useState<SwarmStatusResponse | null>(null);
+  const [beeLoading, setBeeLoading] = useState(false);
+  const [beeError, setBeeError] = useState<string | null>(null);
+  const [attachDialogOpen, setAttachDialogOpen] = useState(false);
+
   const { event: sseEvent, error: sseError, connecting } = useGroveEvents(groveId);
+  const isFlourishing = currentState === 'FLOURISHING';
 
   useEffect(() => {
     getGrove(groveId)
@@ -47,12 +59,30 @@ export default function GroveDetailView() {
       .finally(() => setLoading(false));
   }, [groveId]);
 
+  const fetchBees = () => {
+    setBeeLoading(true);
+    setBeeError(null);
+    Promise.all([listBees(groveId), getSwarmStatus(groveId)])
+      .then(([beeList, status]) => {
+        setBees(beeList);
+        setSwarmStatus(status);
+      })
+      .catch((e: ApiError) => setBeeError(e.message))
+      .finally(() => setBeeLoading(false));
+  };
+
   useEffect(() => {
     if (sseEvent) {
       setCurrentState(sseEvent.newState);
       setActionLoading(false);
     }
   }, [sseEvent]);
+
+  useEffect(() => {
+    if (isFlourishing) {
+      fetchBees();
+    }
+  }, [groveId, isFlourishing]);
 
   useEffect(() => {
     if (!actionLoading) return;
@@ -88,7 +118,6 @@ export default function GroveDetailView() {
   if (!grove) return null;
 
   const seedling = grove.seedling;
-  const isFlourishing = currentState === 'FLOURISHING';
 
   return (
     <Box maxWidth={720}>
@@ -139,14 +168,64 @@ export default function GroveDetailView() {
           <Divider sx={{ my: 3 }} />
           <Typography variant="h6" gutterBottom>Actions</Typography>
           {actionError && <ErrorAlert message={actionError} />}
-          <Button
-            variant="outlined"
-            color="warning"
+          <CommonButton
+            variant="danger"
+            size="sm"
             onClick={handleStop}
             disabled={actionLoading}
           >
             {actionLoading ? 'Stopping…' : 'Stop Grove'}
-          </Button>
+          </CommonButton>
+
+          <Divider sx={{ my: 3 }} />
+          <Typography variant="h6" gutterBottom>Swarm</Typography>
+          {beeError && <ErrorAlert message={beeError} />}
+          {beeLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <>
+              {swarmStatus && swarmStatus.totalBees > 0 && (
+                <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                  <Chip label={`${swarmStatus.totalBees} total`} variant="outlined" />
+                  {Object.entries(swarmStatus.byState).map(([state, count]) => (
+                    <Chip key={state} label={`${count} ${state.toLowerCase()}`} variant="outlined" />
+                  ))}
+                </Stack>
+              )}
+              {bees.length > 0 ? (
+                <Grid container spacing={2}>
+                  {bees.map((bee) => (
+                    <Grid size={{ xs: 12, md: 6 }} key={bee.id}>
+                      <BeeCard bee={bee} onAction={fetchBees} />
+                    </Grid>
+                  ))}
+                </Grid>
+              ) : (
+                !beeError && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    No bees attached. Click Attach Bee to get started.
+                  </Typography>
+                )
+              )}
+              <CommonButton
+                variant="primary"
+                size="sm"
+                startIcon={<Plus size={16} />}
+                onClick={() => setAttachDialogOpen(true)}
+                sx={{ mt: 2 }}
+              >
+                Attach Bee
+              </CommonButton>
+            </>
+          )}
+          <AttachBeeDialog
+            open={attachDialogOpen}
+            onClose={() => {
+              setAttachDialogOpen(false);
+              fetchBees();
+            }}
+            groveId={groveId}
+          />
         </>
       )}
     </Box>
