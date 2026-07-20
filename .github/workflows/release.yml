@@ -52,7 +52,7 @@ jobs:
           fi
 
       - name: Set up GraalVM JDK 25
-        uses: graalvm/setup-graalvm@186d0493a2df5eb62df5ecc498883d18fd58c303  # v1
+        uses: graalvm/setup-graalvm@0def53c0fd8534bc13416c9469f5be45265824fd  # v1
         with:
           java-version: '25'
           distribution: 'graalvm-community'
