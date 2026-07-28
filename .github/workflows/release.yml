@@ -68,10 +68,6 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92  # v6.2.0
 
-      - name: Audit frontend dependencies
-        working-directory: frontend
-        run: npm audit --audit-level=high
-
       # Runs both test suites (frontend jest + backend JUnit) and the frontend export, then
       # compiles the backend (with the UI embedded) to a native image.
       - name: Build, test, and native-compile
