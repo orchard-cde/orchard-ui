@@ -1,5 +1,20 @@
 # AGENTS.md
 
+## Dependabot PRs with split peer dependencies
+
+Dependabot sometimes splits a single logical upgrade (e.g. `react` + `react-dom`,
+which must stay on identical versions) into separate PRs. Each PR fails CI in
+isolation because the peer version doesn't match yet — this is expected, not a
+sign the individual PR is broken.
+
+When this happens:
+- **Do not** manually check out the PR branch, merge/rebase main into it, resolve
+  conflicts, and push yourself.
+- **Do** comment `@dependabot rebase` on the lagging PR after merging its
+  counterpart. Dependabot will rebase it onto main and re-run CI with the
+  matching version now present.
+- Only approve/merge once CI is green after the Dependabot-driven rebase.
+
 Constraints and conventions for contributors and AI agents working in orchard-ui.
 
 ## Repo layout (read first)
