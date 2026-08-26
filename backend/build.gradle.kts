@@ -2,7 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
-    id("org.graalvm.buildtools.native") version "1.1.9"
+    id("org.graalvm.buildtools.native") version "1.1.10"
 }
 
 group = "dev.orchard.ui"
