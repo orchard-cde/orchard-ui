@@ -352,3 +352,37 @@ test('shows the bee error alert when listBees rejects', async () => {
   });
   expect(screen.queryByText(/No bees attached/)).not.toBeInTheDocument();
 });
+
+test('renders the Swarm section above Repository', async () => {
+  (listBees as jest.Mock).mockResolvedValue([buzzingBee]);
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('Swarm')).toBeInTheDocument();
+  });
+
+  const swarm = screen.getByText('Swarm');
+  const repository = screen.getByText('Repository');
+
+  expect(
+    swarm.compareDocumentPosition(repository) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+});
+
+test('keeps Stop Grove below SSH Access', async () => {
+  (listBees as jest.Mock).mockResolvedValue([buzzingBee]);
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'Stop Grove' })).toBeInTheDocument();
+  });
+
+  const ssh = screen.getByText('SSH Access');
+  const actions = screen.getByText('Actions');
+
+  expect(
+    ssh.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+});

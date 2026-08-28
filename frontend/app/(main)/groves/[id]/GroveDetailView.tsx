@@ -145,53 +145,8 @@ export default function GroveDetailView() {
 
       <GroveStateStepper currentState={currentState} connecting={connecting} />
 
-      <Divider sx={{ my: 3 }} />
-
-      <Typography variant="h6" gutterBottom>Repository</Typography>
-      <Typography variant="body2" gutterBottom>
-        {grove.repositoryUrl}
-        {grove.branch ? ` @ ${grove.branch}` : ''}
-      </Typography>
-
-      {seedling && (
-        <>
-          <Divider sx={{ my: 3 }} />
-          <Typography variant="h6" gutterBottom>Resources</Typography>
-          <Stack direction="row" spacing={1}>
-            <Chip label={`${seedling.cpuCores} CPU`} variant="outlined" />
-            <Chip label={`${Math.round(seedling.memoryMb / 1024)} GB RAM`} variant="outlined" />
-            <Chip label={`${seedling.diskGb} GB disk`} variant="outlined" />
-          </Stack>
-        </>
-      )}
-
-      <Divider sx={{ my: 3 }} />
-      <Typography variant="h6" gutterBottom>SSH Access</Typography>
-      {sshError && <ErrorAlert message={sshError} />}
-      {sshConfig ? (
-        <SshConfigBlock config={sshConfig} />
-      ) : (
-        !sshError && (
-          <Typography variant="body2" color="text.secondary">
-            Not ready yet — waiting for the seedling to provision.
-          </Typography>
-        )
-      )}
-
       {isFlourishing && (
         <>
-          <Divider sx={{ my: 3 }} />
-          <Typography variant="h6" gutterBottom>Actions</Typography>
-          {actionError && <ErrorAlert message={actionError} />}
-          <CommonButton
-            variant="danger"
-            size="sm"
-            onClick={handleStop}
-            disabled={actionLoading}
-          >
-            {actionLoading ? 'Stopping…' : 'Stop Grove'}
-          </CommonButton>
-
           <Divider sx={{ my: 3 }} />
           <Typography variant="h6" gutterBottom>Swarm</Typography>
           {beeError && <ErrorAlert message={beeError} />}
@@ -241,6 +196,55 @@ export default function GroveDetailView() {
             }}
             groveId={groveId}
           />
+        </>
+      )}
+
+      <Divider sx={{ my: 3 }} />
+
+      <Typography variant="h6" gutterBottom>Repository</Typography>
+      <Typography variant="body2" gutterBottom>
+        {grove.repositoryUrl}
+        {grove.branch ? ` @ ${grove.branch}` : ''}
+      </Typography>
+
+      {seedling && (
+        <>
+          <Divider sx={{ my: 3 }} />
+          <Typography variant="h6" gutterBottom>Resources</Typography>
+          <Stack direction="row" spacing={1}>
+            <Chip label={`${seedling.cpuCores} CPU`} variant="outlined" />
+            <Chip label={`${Math.round(seedling.memoryMb / 1024)} GB RAM`} variant="outlined" />
+            <Chip label={`${seedling.diskGb} GB disk`} variant="outlined" />
+          </Stack>
+        </>
+      )}
+
+      <Divider sx={{ my: 3 }} />
+      <Typography variant="h6" gutterBottom>SSH Access</Typography>
+      {sshError && <ErrorAlert message={sshError} />}
+      {sshConfig ? (
+        <SshConfigBlock config={sshConfig} />
+      ) : (
+        !sshError && (
+          <Typography variant="body2" color="text.secondary">
+            Not ready yet — waiting for the seedling to provision.
+          </Typography>
+        )
+      )}
+
+      {isFlourishing && (
+        <>
+          <Divider sx={{ my: 3 }} />
+          <Typography variant="h6" gutterBottom>Actions</Typography>
+          {actionError && <ErrorAlert message={actionError} />}
+          <CommonButton
+            variant="danger"
+            size="sm"
+            onClick={handleStop}
+            disabled={actionLoading}
+          >
+            {actionLoading ? 'Stopping…' : 'Stop Grove'}
+          </CommonButton>
         </>
       )}
     </Box>
