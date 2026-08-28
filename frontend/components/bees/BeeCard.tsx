@@ -129,26 +129,24 @@ export default function BeeCard({ bee, onAction }: BeeCardProps) {
         </CardActions>
       </Card>
 
-      {confirmAction && (
-        <Dialog open onClose={() => setConfirmAction(null)}>
-          <DialogTitle>{CONFIRM_COPY[confirmAction].title}</DialogTitle>
-          <DialogContent>
-            <DialogContentText>{CONFIRM_COPY[confirmAction].body}</DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button variant="ghost" onClick={() => setConfirmAction(null)} disabled={loading}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              onClick={confirmAction === 'remove' ? handleRemove : handleSmoke}
-              disabled={loading}
-            >
-              {loading ? 'Working…' : 'Confirm'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      )}
+      <Dialog open={confirmAction !== null} onClose={() => setConfirmAction(null)}>
+        <DialogTitle>{CONFIRM_COPY[confirmAction ?? 'smoke'].title}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>{CONFIRM_COPY[confirmAction ?? 'smoke'].body}</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="ghost" onClick={() => setConfirmAction(null)} disabled={loading}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={confirmAction === 'remove' ? handleRemove : handleSmoke}
+            disabled={loading}
+          >
+            {loading ? 'Working…' : 'Confirm'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

@@ -98,7 +98,6 @@ beforeEach(() => {
   (getGrove as jest.Mock).mockResolvedValue(mockGrove);
   (getSshConfig as jest.Mock).mockResolvedValue('ssh-ed25519 AAA...');
   (listBees as jest.Mock).mockResolvedValue([]);
-  (getSwarmStatus as jest.Mock).mockResolvedValue({ groveId: 'test-id', totalBees: 0, byState: {} });
   capturedOnBeeEvent = undefined;
   (useGroveEvents as jest.Mock).mockImplementation((_groveId: string, opts?: any) => {
     capturedOnBeeEvent = opts?.onBeeEvent;
@@ -166,23 +165,7 @@ test('holds button in stopping state after successful API call until SSE confirm
 });
 
 test('shows swarm section when FLOURISHING', async () => {
-  (listBees as jest.Mock).mockResolvedValue([
-    {
-      id: 'bee-1',
-      groveId: 'test-id',
-      type: 'OPENCODE',
-      state: 'BUZZING',
-      processId: 'proc-1',
-      hatchedAt: '2024-06-01T00:00:00Z',
-      startedAt: '2024-06-01T00:01:00Z',
-      stoppedAt: null,
-    },
-  ]);
-  (getSwarmStatus as jest.Mock).mockResolvedValue({
-    groveId: 'test-id',
-    totalBees: 1,
-    byState: { BUZZING: 1 },
-  });
+  (listBees as jest.Mock).mockResolvedValue([buzzingBee]);
 
   render(<GroveDetailView />);
 
@@ -207,11 +190,6 @@ test('hides swarm section when not FLOURISHING', async () => {
 
 test('shows empty state when FLOURISHING but no bees', async () => {
   (listBees as jest.Mock).mockResolvedValue([]);
-  (getSwarmStatus as jest.Mock).mockResolvedValue({
-    groveId: 'test-id',
-    totalBees: 0,
-    byState: {},
-  });
 
   render(<GroveDetailView />);
 
@@ -219,6 +197,22 @@ test('shows empty state when FLOURISHING but no bees', async () => {
     expect(screen.getByText('Swarm')).toBeInTheDocument();
     expect(screen.getByText(/No bees attached/)).toBeInTheDocument();
   });
+});
+
+test('fetchBees still drives the spinner: no false empty-state flash on the first FLOURISHING render', async () => {
+  (listBees as jest.Mock).mockImplementation(() => new Promise(() => {}));
+
+  // Bypass waitFor's act-wrapped polling here: it settles cascading updates
+  // before any assertion can run, which hides the exact commit under test —
+  // the one where isFlourishing flips true but the fetchBees effect (a
+  // separate passive effect) has not yet run to update beeLoading.
+  render(<GroveDetailView />);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(screen.getByText('Swarm')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  expect(screen.queryByText(/No bees attached/)).not.toBeInTheDocument();
 });
 
 test('derives the swarm chips from the bee list without calling getSwarmStatus', async () => {
@@ -232,6 +226,42 @@ test('derives the swarm chips from the bee list without calling getSwarmStatus',
   expect(screen.getByText('1 buzzing')).toBeInTheDocument();
   expect(screen.getByText('1 hibernating')).toBeInTheDocument();
   expect(getSwarmStatus).not.toHaveBeenCalled();
+});
+
+test('chip order is stable and canonical regardless of bee insertion order', async () => {
+  const pollinatingBee = { ...buzzingBee, id: 'bee-3', state: 'POLLINATING' as const };
+  // Insertion order (BUZZING, HIBERNATING, POLLINATING) would reduce into
+  // that same order if chips followed Object.entries insertion order.
+  (listBees as jest.Mock).mockResolvedValue([buzzingBee, hibernatingBee, pollinatingBee]);
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('3 total')).toBeInTheDocument();
+  });
+
+  const chipLabels = screen
+    .getAllByText(/^\d+ (hatching|hibernating|buzzing|pollinating|smoked)$/)
+    .map((el) => el.textContent);
+
+  expect(chipLabels).toEqual(['1 hibernating', '1 buzzing', '1 pollinating']);
+
+  act(() => {
+    capturedOnBeeEvent?.({
+      beeId: 'bee-1',
+      groveId: 'test-id',
+      previousState: 'BUZZING',
+      newState: 'SMOKED',
+      changedAt: '2024-06-01T00:02:00Z',
+    });
+  });
+
+  await waitFor(() => {
+    const patchedLabels = screen
+      .getAllByText(/^\d+ (hatching|hibernating|buzzing|pollinating|smoked)$/)
+      .map((el) => el.textContent);
+    expect(patchedLabels).toEqual(['1 hibernating', '1 pollinating', '1 smoked']);
+  });
 });
 
 test('a bee event patches the matching card and updates the chips', async () => {

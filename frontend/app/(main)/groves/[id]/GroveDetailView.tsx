@@ -20,7 +20,9 @@ import StatusChip from '@/components/groves/StatusChip';
 import { getGrove, getSshConfig, stopGrove } from '@/lib/api/groves';
 import { listBees } from '@/lib/api/bees';
 import { useGroveEvents, type BeeEvent } from '@/lib/events/useGroveEvents';
-import type { GroveResponse, GroveState, ApiError, BeeResponse } from '@/types/orchard';
+import type { GroveResponse, GroveState, ApiError, BeeResponse, BeeState } from '@/types/orchard';
+
+const BEE_STATE_ORDER: BeeState[] = ['HATCHING', 'HIBERNATING', 'BUZZING', 'POLLINATING', 'SMOKED'];
 
 export default function GroveDetailView() {
   // In a Next.js static export, the [id] dynamic route is emitted only as the
@@ -41,7 +43,7 @@ export default function GroveDetailView() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [bees, setBees] = useState<BeeResponse[]>([]);
-  const [beeLoading, setBeeLoading] = useState(false);
+  const [beeLoading, setBeeLoading] = useState(true);
   const [beeError, setBeeError] = useState<string | null>(null);
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
 
@@ -56,16 +58,16 @@ export default function GroveDetailView() {
   });
   const isFlourishing = currentState === 'FLOURISHING';
 
-  const swarmSummary = useMemo(
-    () => ({
-      totalBees: bees.length,
-      byState: bees.reduce<Record<string, number>>((acc, b) => {
-        acc[b.state] = (acc[b.state] ?? 0) + 1;
-        return acc;
-      }, {}),
-    }),
-    [bees],
-  );
+  const swarmSummary = useMemo(() => {
+    const byState = bees.reduce<Record<string, number>>((acc, b) => {
+      acc[b.state] = (acc[b.state] ?? 0) + 1;
+      return acc;
+    }, {});
+    const sortedByState = BEE_STATE_ORDER
+      .filter((state) => byState[state] !== undefined)
+      .map((state) => [state, byState[state]] as const);
+    return { totalBees: bees.length, byState, sortedByState };
+  }, [bees]);
 
   useEffect(() => {
     getGrove(groveId)
@@ -157,7 +159,7 @@ export default function GroveDetailView() {
               {swarmSummary.totalBees > 0 && (
                 <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
                   <Chip label={`${swarmSummary.totalBees} total`} variant="outlined" />
-                  {Object.entries(swarmSummary.byState).map(([state, count]) => (
+                  {swarmSummary.sortedByState.map(([state, count]) => (
                     <Chip key={state} label={`${count} ${state.toLowerCase()}`} variant="outlined" />
                   ))}
                 </Stack>
