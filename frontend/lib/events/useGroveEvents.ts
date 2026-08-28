@@ -1,13 +1,25 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { GroveState } from '@/types/orchard';
+import type { GroveState, BeeState } from '@/types/orchard';
 import { getCultivatorId } from '@/lib/auth';
 
 export interface GroveEvent {
   newState: GroveState;
   previousState: GroveState;
   changedAt: string;
+}
+
+export interface BeeEvent {
+  beeId: string;
+  groveId: string;
+  previousState: BeeState;
+  newState: BeeState;
+  changedAt: string;
+}
+
+export interface UseGroveEventsOptions {
+  onBeeEvent?: (event: BeeEvent) => void;
 }
 
 export interface UseGroveEventsResult {
@@ -19,12 +31,20 @@ export interface UseGroveEventsResult {
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
-export function useGroveEvents(groveId: string): UseGroveEventsResult {
+export function useGroveEvents(
+  groveId: string,
+  options?: UseGroveEventsOptions,
+): UseGroveEventsResult {
   const [event, setEvent] = useState<GroveEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(true);
   const retriesRef = useRef(0);
   const esRef = useRef<EventSource | null>(null);
+  const onBeeEventRef = useRef(options?.onBeeEvent);
+
+  useEffect(() => {
+    onBeeEventRef.current = options?.onBeeEvent;
+  }, [options?.onBeeEvent]);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +71,21 @@ export function useGroveEvents(groveId: string): UseGroveEventsResult {
           retriesRef.current = 0;
           setConnecting(false);
           setError(null);
+        } catch {
+          // ignore malformed events
+        }
+      });
+
+      es.addEventListener('bee-state-changed', (e: MessageEvent) => {
+        try {
+          const payload = JSON.parse(e.data);
+          onBeeEventRef.current?.({
+            beeId: payload.beeId,
+            groveId: payload.groveId,
+            previousState: payload.previousState,
+            newState: payload.newState,
+            changedAt: payload.changedAt,
+          });
         } catch {
           // ignore malformed events
         }
