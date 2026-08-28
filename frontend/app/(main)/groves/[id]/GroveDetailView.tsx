@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -18,9 +18,9 @@ import GroveStateStepper from '@/components/groves/GroveStateStepper';
 import SshConfigBlock from '@/components/groves/SshConfigBlock';
 import StatusChip from '@/components/groves/StatusChip';
 import { getGrove, getSshConfig, stopGrove } from '@/lib/api/groves';
-import { listBees, getSwarmStatus } from '@/lib/api/bees';
-import { useGroveEvents } from '@/lib/events/useGroveEvents';
-import type { GroveResponse, GroveState, ApiError, BeeResponse, SwarmStatusResponse } from '@/types/orchard';
+import { listBees } from '@/lib/api/bees';
+import { useGroveEvents, type BeeEvent } from '@/lib/events/useGroveEvents';
+import type { GroveResponse, GroveState, ApiError, BeeResponse } from '@/types/orchard';
 
 export default function GroveDetailView() {
   // In a Next.js static export, the [id] dynamic route is emitted only as the
@@ -41,13 +41,31 @@ export default function GroveDetailView() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [bees, setBees] = useState<BeeResponse[]>([]);
-  const [swarmStatus, setSwarmStatus] = useState<SwarmStatusResponse | null>(null);
   const [beeLoading, setBeeLoading] = useState(false);
   const [beeError, setBeeError] = useState<string | null>(null);
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
 
-  const { event: sseEvent, error: sseError, connecting } = useGroveEvents(groveId);
+  const handleBeeEvent = useCallback((e: BeeEvent) => {
+    setBees((prev) =>
+      prev.map((b) => (b.id === e.beeId ? { ...b, state: e.newState } : b)),
+    );
+  }, []);
+
+  const { event: sseEvent, error: sseError, connecting } = useGroveEvents(groveId, {
+    onBeeEvent: handleBeeEvent,
+  });
   const isFlourishing = currentState === 'FLOURISHING';
+
+  const swarmSummary = useMemo(
+    () => ({
+      totalBees: bees.length,
+      byState: bees.reduce<Record<string, number>>((acc, b) => {
+        acc[b.state] = (acc[b.state] ?? 0) + 1;
+        return acc;
+      }, {}),
+    }),
+    [bees],
+  );
 
   useEffect(() => {
     getGrove(groveId)
@@ -62,11 +80,8 @@ export default function GroveDetailView() {
   const fetchBees = () => {
     setBeeLoading(true);
     setBeeError(null);
-    Promise.all([listBees(groveId), getSwarmStatus(groveId)])
-      .then(([beeList, status]) => {
-        setBees(beeList);
-        setSwarmStatus(status);
-      })
+    listBees(groveId)
+      .then(setBees)
       .catch((e: ApiError) => setBeeError(e.message))
       .finally(() => setBeeLoading(false));
   };
@@ -184,10 +199,10 @@ export default function GroveDetailView() {
             <LoadingSpinner />
           ) : (
             <>
-              {swarmStatus && swarmStatus.totalBees > 0 && (
+              {swarmSummary.totalBees > 0 && (
                 <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                  <Chip label={`${swarmStatus.totalBees} total`} variant="outlined" />
-                  {Object.entries(swarmStatus.byState).map(([state, count]) => (
+                  <Chip label={`${swarmSummary.totalBees} total`} variant="outlined" />
+                  {Object.entries(swarmSummary.byState).map(([state, count]) => (
                     <Chip key={state} label={`${count} ${state.toLowerCase()}`} variant="outlined" />
                   ))}
                 </Stack>
