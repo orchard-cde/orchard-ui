@@ -47,14 +47,15 @@ export default function GroveDetailView() {
   const [beeError, setBeeError] = useState<string | null>(null);
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
 
-  // Guards fetchBees against two races: an older refetch resolving after a
-  // newer one (fetchGenerationRef), and a refetch resolving with a
-  // pre-patch snapshot after a live SSE update landed (sseVersionRef).
+  // fetchGenerationRef ensures only the most recently issued fetchBees()
+  // commits. pendingPatchesRef holds SSE patches recorded since the last
+  // committed fetch, so a fetch that lands after a patch (even for a bee
+  // not yet in its own snapshot) can overlay it instead of discarding it.
   const fetchGenerationRef = useRef(0);
-  const sseVersionRef = useRef(0);
+  const pendingPatchesRef = useRef<Map<string, BeeState>>(new Map());
 
   const handleBeeEvent = useCallback((e: BeeEvent) => {
-    sseVersionRef.current += 1;
+    pendingPatchesRef.current.set(e.beeId, e.newState);
     setBees((prev) =>
       prev.map((b) => (b.id === e.beeId ? { ...b, state: e.newState } : b)),
     );
@@ -88,15 +89,17 @@ export default function GroveDetailView() {
 
   const fetchBees = () => {
     const requestId = ++fetchGenerationRef.current;
-    const sseVersionAtRequest = sseVersionRef.current;
     setBeeLoading(true);
     setBeeError(null);
     listBees(groveId)
       .then((data) => {
         if (fetchGenerationRef.current !== requestId) return;
-        if (sseVersionRef.current === sseVersionAtRequest) {
-          setBees(data);
-        }
+        const patches = pendingPatchesRef.current;
+        const merged = patches.size === 0
+          ? data
+          : data.map((b) => (patches.has(b.id) ? { ...b, state: patches.get(b.id)! } : b));
+        patches.clear();
+        setBees(merged);
       })
       .catch((e: ApiError) => {
         if (fetchGenerationRef.current !== requestId) return;

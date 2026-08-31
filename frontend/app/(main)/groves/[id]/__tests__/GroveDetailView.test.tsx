@@ -488,3 +488,34 @@ test('an SSE patch applied during a refetch survives the stale refetch response 
     expect(screen.getByTestId('bee-bee-1')).toHaveTextContent('SMOKED');
   });
 });
+
+test('an SSE patch for a bee not yet in the list is not lost when the first fetch resolves', async () => {
+  const resolvers: Array<(bees: any[]) => void> = [];
+  (listBees as jest.Mock).mockImplementation(
+    () => new Promise((resolve) => { resolvers.push(resolve); }),
+  );
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(1));
+
+  // The bee isn't in the list yet (bees is still []), so this patch is a
+  // no-op against the current state, but it must not be discarded.
+  act(() => {
+    capturedOnBeeEvent?.({
+      beeId: 'bee-1',
+      groveId: 'test-id',
+      previousState: 'BUZZING',
+      newState: 'POLLINATING',
+      changedAt: '2024-06-01T00:02:00Z',
+    });
+  });
+
+  await act(async () => { resolvers[0]([buzzingBee]); });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-1')).toBeInTheDocument();
+  });
+  expect(screen.queryByText(/No bees attached/)).not.toBeInTheDocument();
+  expect(screen.getByTestId('bee-bee-1')).toHaveTextContent('POLLINATING');
+});
