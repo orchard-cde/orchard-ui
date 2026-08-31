@@ -21,8 +21,7 @@ import { getGrove, getSshConfig, stopGrove } from '@/lib/api/groves';
 import { listBees } from '@/lib/api/bees';
 import { useGroveEvents, type BeeEvent } from '@/lib/events/useGroveEvents';
 import type { GroveResponse, GroveState, ApiError, BeeResponse, BeeState } from '@/types/orchard';
-
-const BEE_STATE_ORDER: BeeState[] = ['HATCHING', 'HIBERNATING', 'BUZZING', 'POLLINATING', 'SMOKED'];
+import { BEE_STATE_ORDER } from '@/types/orchard';
 
 export default function GroveDetailView() {
   // In a Next.js static export, the [id] dynamic route is emitted only as the
@@ -89,6 +88,13 @@ export default function GroveDetailView() {
 
   const fetchBees = () => {
     const requestId = ++fetchGenerationRef.current;
+    // Only patches that arrive between this dispatch and its own response
+    // should be preserved. Any patch recorded before now — including one
+    // still unresolved from an earlier, now-superseded fetch — is guaranteed
+    // to already be reflected in this request's server response, since the
+    // SSE notification for it fires only after the server-side write, which
+    // happens before this dispatch.
+    pendingPatchesRef.current.clear();
     setBeeLoading(true);
     setBeeError(null);
     listBees(groveId)

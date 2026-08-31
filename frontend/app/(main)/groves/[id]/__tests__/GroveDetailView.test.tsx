@@ -519,3 +519,45 @@ test('an SSE patch for a bee not yet in the list is not lost when the first fetc
   expect(screen.queryByText(/No bees attached/)).not.toBeInTheDocument();
   expect(screen.getByTestId('bee-bee-1')).toHaveTextContent('POLLINATING');
 });
+
+test('a patch recorded while idle does not overlay a later, fresher fetch', async () => {
+  const resolvers: Array<(bees: any[]) => void> = [];
+  (listBees as jest.Mock).mockImplementation(
+    () => new Promise((resolve) => { resolvers.push(resolve); }),
+  );
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(1));
+  await act(async () => { resolvers[0]([{ ...buzzingBee, state: 'HATCHING' }]); });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-1')).toHaveTextContent('HATCHING');
+  });
+
+  // SSE patch arrives while no fetch is in flight: HATCHING -> HIBERNATING.
+  act(() => {
+    capturedOnBeeEvent?.({
+      beeId: 'bee-1',
+      groveId: 'test-id',
+      previousState: 'HATCHING',
+      newState: 'HIBERNATING',
+      changedAt: '2024-06-01T00:02:00Z',
+    });
+  });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-1')).toHaveTextContent('HIBERNATING');
+  });
+
+  // Server advances further to BUZZING but that SSE message is dropped.
+  // A card action triggers a refetch, which correctly returns BUZZING.
+  act(() => { capturedOnAction?.(); });
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(2));
+
+  await act(async () => { resolvers[1]([{ ...buzzingBee, state: 'BUZZING' }]); });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-1')).toHaveTextContent('BUZZING');
+  });
+});

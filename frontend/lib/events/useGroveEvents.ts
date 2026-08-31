@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { GroveState, BeeState } from '@/types/orchard';
+import { BEE_STATE_ORDER } from '@/types/orchard';
 import { getCultivatorId } from '@/lib/auth';
 
 export interface GroveEvent {
@@ -30,6 +31,26 @@ export interface UseGroveEventsResult {
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
+
+function isBeeState(value: unknown): value is BeeState {
+  return typeof value === 'string' && (BEE_STATE_ORDER as readonly string[]).includes(value);
+}
+
+// JSON.parse succeeding only means the payload is syntactically valid JSON,
+// not that it matches the BeeEvent shape — the server (or a malicious/buggy
+// intermediary) could send a syntactically-valid payload missing fields or
+// carrying an unrecognized state, which would flow straight through to the
+// UI otherwise.
+function isValidBeeEventPayload(payload: unknown): payload is BeeEvent {
+  if (typeof payload !== 'object' || payload === null) return false;
+  const p = payload as Record<string, unknown>;
+  return (
+    typeof p.beeId === 'string' && p.beeId.length > 0 &&
+    typeof p.groveId === 'string' && p.groveId.length > 0 &&
+    isBeeState(p.previousState) &&
+    isBeeState(p.newState)
+  );
+}
 
 export function useGroveEvents(
   groveId: string,
@@ -85,6 +106,7 @@ export function useGroveEvents(
       es.addEventListener('bee-state-changed', (e: MessageEvent) => {
         try {
           const payload = JSON.parse(e.data);
+          if (!isValidBeeEventPayload(payload)) return;
           onBeeEventRef.current?.({
             beeId: payload.beeId,
             groveId: payload.groveId,

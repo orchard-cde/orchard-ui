@@ -62,12 +62,52 @@ test('passes a bee-state-changed payload to onBeeEvent', () => {
   expect(onBeeEvent).toHaveBeenCalledWith(BEE_PAYLOAD);
 });
 
-test('ignores a malformed bee-state-changed payload', () => {
+test('ignores a syntactically invalid bee-state-changed payload', () => {
   const onBeeEvent = jest.fn();
   renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
 
   act(() => {
     MockEventSource.instances[0].emit('bee-state-changed', 'not json{');
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload missing groveId', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    const { groveId, ...withoutGroveId } = BEE_PAYLOAD;
+    MockEventSource.instances[0].emit('bee-state-changed', withoutGroveId);
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with an invalid newState', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', {
+      ...BEE_PAYLOAD,
+      newState: 'NOT_A_STATE',
+    });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with a non-string beeId', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', {
+      ...BEE_PAYLOAD,
+      beeId: 42,
+    });
   });
 
   expect(onBeeEvent).not.toHaveBeenCalled();
