@@ -33,13 +33,16 @@ jest.mock('@/components/common/Button', () => ({
 
 jest.mock('@/components/bees/BeeCard', () => ({
   __esModule: true,
-  default: ({ bee }: any) => (
-    <div data-testid={`bee-${bee.id}`}>
-      {[bee.state, bee.type, bee.processId, bee.hatchedAt, bee.startedAt, bee.stoppedAt]
-        .map((v) => String(v))
-        .join('|')}
-    </div>
-  ),
+  default: ({ bee, onAction }: any) => {
+    capturedOnAction = onAction;
+    return (
+      <div data-testid={`bee-${bee.id}`}>
+        {[bee.state, bee.type, bee.processId, bee.hatchedAt, bee.startedAt, bee.stoppedAt]
+          .map((v) => String(v))
+          .join('|')}
+      </div>
+    );
+  },
 }));
 
 jest.mock('@/components/bees/AttachBeeDialog', () => ({
@@ -92,6 +95,7 @@ const hibernatingBee = {
 };
 
 let capturedOnBeeEvent: ((e: any) => void) | undefined;
+let capturedOnAction: (() => void) | undefined;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -99,6 +103,7 @@ beforeEach(() => {
   (getSshConfig as jest.Mock).mockResolvedValue('ssh-ed25519 AAA...');
   (listBees as jest.Mock).mockResolvedValue([]);
   capturedOnBeeEvent = undefined;
+  capturedOnAction = undefined;
   (useGroveEvents as jest.Mock).mockImplementation((_groveId: string, opts?: any) => {
     capturedOnBeeEvent = opts?.onBeeEvent;
     return { event: null, error: null, connecting: false };
@@ -415,4 +420,71 @@ test('keeps Stop Grove below SSH Access', async () => {
   expect(
     ssh.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
+});
+
+test('a stale fetchBees response does not clobber a newer one that resolved first', async () => {
+  const resolvers: Array<(bees: any[]) => void> = [];
+  (listBees as jest.Mock).mockImplementation(
+    () => new Promise((resolve) => { resolvers.push(resolve); }),
+  );
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(1));
+  await act(async () => { resolvers[0]([hibernatingBee]); });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-2')).toHaveTextContent('HIBERNATING');
+  });
+
+  act(() => { capturedOnAction?.(); });
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(2));
+
+  act(() => { capturedOnAction?.(); });
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(3));
+
+  // Newer request (call #3) resolves first with POLLINATING; older request
+  // (call #2) resolves after with HIBERNATING. The newer result must win.
+  await act(async () => { resolvers[2]([{ ...hibernatingBee, state: 'POLLINATING' }]); });
+  await act(async () => { resolvers[1]([{ ...hibernatingBee, state: 'HIBERNATING' }]); });
+
+  expect(screen.getByTestId('bee-bee-2')).toHaveTextContent('POLLINATING');
+});
+
+test('an SSE patch applied during a refetch survives the stale refetch response landing later', async () => {
+  const resolvers: Array<(bees: any[]) => void> = [];
+  (listBees as jest.Mock).mockImplementation(
+    () => new Promise((resolve) => { resolvers.push(resolve); }),
+  );
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(1));
+  await act(async () => { resolvers[0]([buzzingBee]); });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-1')).toHaveTextContent('BUZZING');
+  });
+
+  act(() => { capturedOnAction?.(); });
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(2));
+
+  // The refetch is now in flight (beeLoading hides the card list). Deliver
+  // the SSE patch while it's still pending.
+  act(() => {
+    capturedOnBeeEvent?.({
+      beeId: 'bee-1',
+      groveId: 'test-id',
+      previousState: 'BUZZING',
+      newState: 'SMOKED',
+      changedAt: '2024-06-01T00:02:00Z',
+    });
+  });
+
+  // The in-flight refetch resolves with the pre-patch snapshot; the SSE patch must hold.
+  await act(async () => { resolvers[1]([buzzingBee]); });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-1')).toHaveTextContent('SMOKED');
+  });
 });

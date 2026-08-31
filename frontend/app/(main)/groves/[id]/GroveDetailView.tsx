@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -47,7 +47,14 @@ export default function GroveDetailView() {
   const [beeError, setBeeError] = useState<string | null>(null);
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
 
+  // Guards fetchBees against two races: an older refetch resolving after a
+  // newer one (fetchGenerationRef), and a refetch resolving with a
+  // pre-patch snapshot after a live SSE update landed (sseVersionRef).
+  const fetchGenerationRef = useRef(0);
+  const sseVersionRef = useRef(0);
+
   const handleBeeEvent = useCallback((e: BeeEvent) => {
+    sseVersionRef.current += 1;
     setBees((prev) =>
       prev.map((b) => (b.id === e.beeId ? { ...b, state: e.newState } : b)),
     );
@@ -80,12 +87,25 @@ export default function GroveDetailView() {
   }, [groveId]);
 
   const fetchBees = () => {
+    const requestId = ++fetchGenerationRef.current;
+    const sseVersionAtRequest = sseVersionRef.current;
     setBeeLoading(true);
     setBeeError(null);
     listBees(groveId)
-      .then(setBees)
-      .catch((e: ApiError) => setBeeError(e.message))
-      .finally(() => setBeeLoading(false));
+      .then((data) => {
+        if (fetchGenerationRef.current !== requestId) return;
+        if (sseVersionRef.current === sseVersionAtRequest) {
+          setBees(data);
+        }
+      })
+      .catch((e: ApiError) => {
+        if (fetchGenerationRef.current !== requestId) return;
+        setBeeError(e.message);
+      })
+      .finally(() => {
+        if (fetchGenerationRef.current !== requestId) return;
+        setBeeLoading(false);
+      });
   };
 
   useEffect(() => {

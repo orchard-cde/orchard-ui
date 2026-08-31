@@ -49,6 +49,12 @@ export function useGroveEvents(
   useEffect(() => {
     let cancelled = false;
 
+    // Each groveId gets its own retry budget and connection state — carrying
+    // the previous grove's over would jump straight to the terminal error.
+    retriesRef.current = 0;
+    setEvent(null);
+    setError(null);
+
     function connect() {
       if (cancelled) return;
 

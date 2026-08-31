@@ -131,6 +131,40 @@ test('re-attaches the bee listener after a reconnect', () => {
   expect(onBeeEvent).toHaveBeenCalledWith(BEE_PAYLOAD);
 });
 
+test('resets the retry budget and error when groveId changes', () => {
+  const { result, rerender } = renderHook(
+    ({ groveId }: { groveId: string }) => useGroveEvents(groveId),
+    { initialProps: { groveId: 'grove-a' } },
+  );
+
+  // Exhaust grove A's retry budget (MAX_RETRIES = 3).
+  act(() => { MockEventSource.instances[0].onerror?.(); });
+  act(() => { jest.advanceTimersByTime(1000); });
+  act(() => { MockEventSource.instances[1].onerror?.(); });
+  act(() => { jest.advanceTimersByTime(2000); });
+  act(() => { MockEventSource.instances[2].onerror?.(); });
+  act(() => { jest.advanceTimersByTime(4000); });
+  act(() => { MockEventSource.instances[3].onerror?.(); });
+
+  expect(result.current.error).toBe('Lost connection to grove. Please refresh.');
+  expect(MockEventSource.instances).toHaveLength(4);
+
+  rerender({ groveId: 'grove-b' });
+
+  expect(MockEventSource.instances).toHaveLength(5);
+  expect(result.current.error).toBeNull();
+
+  // Grove B's first error should get its own retry budget, not go straight
+  // to terminal because of A's exhausted retriesRef.
+  act(() => { MockEventSource.instances[4].onerror?.(); });
+
+  expect(result.current.error).toBeNull();
+
+  act(() => { jest.advanceTimersByTime(1000); });
+
+  expect(MockEventSource.instances).toHaveLength(6);
+});
+
 test('a changing onBeeEvent identity does not rebuild the EventSource', () => {
   const first = jest.fn();
   const { rerender } = renderHook(
