@@ -1,13 +1,26 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { GroveState } from '@/types/orchard';
+import type { GroveState, BeeState } from '@/types/orchard';
+import { BEE_STATE_ORDER } from '@/types/orchard';
 import { getCultivatorId } from '@/lib/auth';
 
 export interface GroveEvent {
   newState: GroveState;
   previousState: GroveState;
   changedAt: string;
+}
+
+export interface BeeEvent {
+  beeId: string;
+  groveId: string;
+  previousState: BeeState;
+  newState: BeeState;
+  changedAt: string;
+}
+
+export interface UseGroveEventsOptions {
+  onBeeEvent?: (event: BeeEvent) => void;
 }
 
 export interface UseGroveEventsResult {
@@ -19,15 +32,49 @@ export interface UseGroveEventsResult {
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
-export function useGroveEvents(groveId: string): UseGroveEventsResult {
+function isBeeState(value: unknown): value is BeeState {
+  return typeof value === 'string' && (BEE_STATE_ORDER as readonly string[]).includes(value);
+}
+
+// JSON.parse succeeding only means the payload is syntactically valid JSON,
+// not that it matches the BeeEvent shape — the server (or a malicious/buggy
+// intermediary) could send a syntactically-valid payload missing fields or
+// carrying an unrecognized state, which would flow straight through to the
+// UI otherwise.
+function isValidBeeEventPayload(payload: unknown): payload is BeeEvent {
+  if (typeof payload !== 'object' || payload === null) return false;
+  const p = payload as Record<string, unknown>;
+  return (
+    typeof p.beeId === 'string' && p.beeId.length > 0 &&
+    typeof p.groveId === 'string' && p.groveId.length > 0 &&
+    isBeeState(p.previousState) &&
+    isBeeState(p.newState)
+  );
+}
+
+export function useGroveEvents(
+  groveId: string,
+  options?: UseGroveEventsOptions,
+): UseGroveEventsResult {
   const [event, setEvent] = useState<GroveEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(true);
   const retriesRef = useRef(0);
   const esRef = useRef<EventSource | null>(null);
+  const onBeeEventRef = useRef(options?.onBeeEvent);
+
+  useEffect(() => {
+    onBeeEventRef.current = options?.onBeeEvent;
+  }, [options?.onBeeEvent]);
 
   useEffect(() => {
     let cancelled = false;
+
+    // Each groveId gets its own retry budget and connection state — carrying
+    // the previous grove's over would jump straight to the terminal error.
+    retriesRef.current = 0;
+    setEvent(null);
+    setError(null);
 
     function connect() {
       if (cancelled) return;
@@ -51,6 +98,22 @@ export function useGroveEvents(groveId: string): UseGroveEventsResult {
           retriesRef.current = 0;
           setConnecting(false);
           setError(null);
+        } catch {
+          // ignore malformed events
+        }
+      });
+
+      es.addEventListener('bee-state-changed', (e: MessageEvent) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (!isValidBeeEventPayload(payload)) return;
+          onBeeEventRef.current?.({
+            beeId: payload.beeId,
+            groveId: payload.groveId,
+            previousState: payload.previousState,
+            newState: payload.newState,
+            changedAt: payload.changedAt,
+          });
         } catch {
           // ignore malformed events
         }

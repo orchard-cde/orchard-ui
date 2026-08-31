@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -18,9 +18,10 @@ import GroveStateStepper from '@/components/groves/GroveStateStepper';
 import SshConfigBlock from '@/components/groves/SshConfigBlock';
 import StatusChip from '@/components/groves/StatusChip';
 import { getGrove, getSshConfig, stopGrove } from '@/lib/api/groves';
-import { listBees, getSwarmStatus } from '@/lib/api/bees';
-import { useGroveEvents } from '@/lib/events/useGroveEvents';
-import type { GroveResponse, GroveState, ApiError, BeeResponse, SwarmStatusResponse } from '@/types/orchard';
+import { listBees } from '@/lib/api/bees';
+import { useGroveEvents, type BeeEvent } from '@/lib/events/useGroveEvents';
+import type { GroveResponse, GroveState, ApiError, BeeResponse, BeeState } from '@/types/orchard';
+import { BEE_STATE_ORDER } from '@/types/orchard';
 
 export default function GroveDetailView() {
   // In a Next.js static export, the [id] dynamic route is emitted only as the
@@ -41,13 +42,39 @@ export default function GroveDetailView() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [bees, setBees] = useState<BeeResponse[]>([]);
-  const [swarmStatus, setSwarmStatus] = useState<SwarmStatusResponse | null>(null);
-  const [beeLoading, setBeeLoading] = useState(false);
+  const [beeLoading, setBeeLoading] = useState(true);
   const [beeError, setBeeError] = useState<string | null>(null);
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
 
-  const { event: sseEvent, error: sseError, connecting } = useGroveEvents(groveId);
+  // fetchGenerationRef ensures only the most recently issued fetchBees()
+  // commits. pendingPatchesRef holds SSE patches recorded since the last
+  // committed fetch, so a fetch that lands after a patch (even for a bee
+  // not yet in its own snapshot) can overlay it instead of discarding it.
+  const fetchGenerationRef = useRef(0);
+  const pendingPatchesRef = useRef<Map<string, BeeState>>(new Map());
+
+  const handleBeeEvent = useCallback((e: BeeEvent) => {
+    pendingPatchesRef.current.set(e.beeId, e.newState);
+    setBees((prev) =>
+      prev.map((b) => (b.id === e.beeId ? { ...b, state: e.newState } : b)),
+    );
+  }, []);
+
+  const { event: sseEvent, error: sseError, connecting } = useGroveEvents(groveId, {
+    onBeeEvent: handleBeeEvent,
+  });
   const isFlourishing = currentState === 'FLOURISHING';
+
+  const swarmSummary = useMemo(() => {
+    const byState = bees.reduce<Record<string, number>>((acc, b) => {
+      acc[b.state] = (acc[b.state] ?? 0) + 1;
+      return acc;
+    }, {});
+    const sortedByState = BEE_STATE_ORDER
+      .filter((state) => byState[state] !== undefined)
+      .map((state) => [state, byState[state]] as const);
+    return { totalBees: bees.length, byState, sortedByState };
+  }, [bees]);
 
   useEffect(() => {
     getGrove(groveId)
@@ -60,15 +87,34 @@ export default function GroveDetailView() {
   }, [groveId]);
 
   const fetchBees = () => {
+    const requestId = ++fetchGenerationRef.current;
+    // Only patches that arrive between this dispatch and its own response
+    // should be preserved. Any patch recorded before now — including one
+    // still unresolved from an earlier, now-superseded fetch — is guaranteed
+    // to already be reflected in this request's server response, since the
+    // SSE notification for it fires only after the server-side write, which
+    // happens before this dispatch.
+    pendingPatchesRef.current.clear();
     setBeeLoading(true);
     setBeeError(null);
-    Promise.all([listBees(groveId), getSwarmStatus(groveId)])
-      .then(([beeList, status]) => {
-        setBees(beeList);
-        setSwarmStatus(status);
+    listBees(groveId)
+      .then((data) => {
+        if (fetchGenerationRef.current !== requestId) return;
+        const patches = pendingPatchesRef.current;
+        const merged = patches.size === 0
+          ? data
+          : data.map((b) => (patches.has(b.id) ? { ...b, state: patches.get(b.id)! } : b));
+        patches.clear();
+        setBees(merged);
       })
-      .catch((e: ApiError) => setBeeError(e.message))
-      .finally(() => setBeeLoading(false));
+      .catch((e: ApiError) => {
+        if (fetchGenerationRef.current !== requestId) return;
+        setBeeError(e.message);
+      })
+      .finally(() => {
+        if (fetchGenerationRef.current !== requestId) return;
+        setBeeLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -130,6 +176,60 @@ export default function GroveDetailView() {
 
       <GroveStateStepper currentState={currentState} connecting={connecting} />
 
+      {isFlourishing && (
+        <>
+          <Divider sx={{ my: 3 }} />
+          <Typography variant="h6" gutterBottom>Swarm</Typography>
+          {beeError && <ErrorAlert message={beeError} />}
+          {beeLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <>
+              {swarmSummary.totalBees > 0 && (
+                <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                  <Chip label={`${swarmSummary.totalBees} total`} variant="outlined" />
+                  {swarmSummary.sortedByState.map(([state, count]) => (
+                    <Chip key={state} label={`${count} ${state.toLowerCase()}`} variant="outlined" />
+                  ))}
+                </Stack>
+              )}
+              {bees.length > 0 ? (
+                <Grid container spacing={2}>
+                  {bees.map((bee) => (
+                    <Grid size={{ xs: 12, md: 6 }} key={bee.id}>
+                      <BeeCard bee={bee} onAction={fetchBees} />
+                    </Grid>
+                  ))}
+                </Grid>
+              ) : (
+                !beeError && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    No bees attached. Click Attach Bee to get started.
+                  </Typography>
+                )
+              )}
+              <CommonButton
+                variant="primary"
+                size="sm"
+                startIcon={<Plus size={16} />}
+                onClick={() => setAttachDialogOpen(true)}
+                sx={{ mt: 2 }}
+              >
+                Attach Bee
+              </CommonButton>
+            </>
+          )}
+          <AttachBeeDialog
+            open={attachDialogOpen}
+            onClose={() => {
+              setAttachDialogOpen(false);
+              fetchBees();
+            }}
+            groveId={groveId}
+          />
+        </>
+      )}
+
       <Divider sx={{ my: 3 }} />
 
       <Typography variant="h6" gutterBottom>Repository</Typography>
@@ -176,56 +276,6 @@ export default function GroveDetailView() {
           >
             {actionLoading ? 'Stopping…' : 'Stop Grove'}
           </CommonButton>
-
-          <Divider sx={{ my: 3 }} />
-          <Typography variant="h6" gutterBottom>Swarm</Typography>
-          {beeError && <ErrorAlert message={beeError} />}
-          {beeLoading ? (
-            <LoadingSpinner />
-          ) : (
-            <>
-              {swarmStatus && swarmStatus.totalBees > 0 && (
-                <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                  <Chip label={`${swarmStatus.totalBees} total`} variant="outlined" />
-                  {Object.entries(swarmStatus.byState).map(([state, count]) => (
-                    <Chip key={state} label={`${count} ${state.toLowerCase()}`} variant="outlined" />
-                  ))}
-                </Stack>
-              )}
-              {bees.length > 0 ? (
-                <Grid container spacing={2}>
-                  {bees.map((bee) => (
-                    <Grid size={{ xs: 12, md: 6 }} key={bee.id}>
-                      <BeeCard bee={bee} onAction={fetchBees} />
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : (
-                !beeError && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    No bees attached. Click Attach Bee to get started.
-                  </Typography>
-                )
-              )}
-              <CommonButton
-                variant="primary"
-                size="sm"
-                startIcon={<Plus size={16} />}
-                onClick={() => setAttachDialogOpen(true)}
-                sx={{ mt: 2 }}
-              >
-                Attach Bee
-              </CommonButton>
-            </>
-          )}
-          <AttachBeeDialog
-            open={attachDialogOpen}
-            onClose={() => {
-              setAttachDialogOpen(false);
-              fetchBees();
-            }}
-            groveId={groveId}
-          />
         </>
       )}
     </Box>
