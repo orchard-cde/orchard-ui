@@ -1,13 +1,33 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { GroveState } from '@/types/orchard';
+import type { GroveState, BeeState } from '@/types/orchard';
+import { BEE_STATE_ORDER } from '@/types/orchard';
 import { getCultivatorId } from '@/lib/auth';
 
 export interface GroveEvent {
   newState: GroveState;
   previousState: GroveState;
   changedAt: string;
+}
+
+export interface BeeEvent {
+  beeId: string;
+  groveId: string;
+  previousState: BeeState;
+  newState: BeeState;
+  changedAt: string;
+}
+
+export interface BeeRemovedEvent {
+  beeId: string;
+  groveId: string;
+  removedAt: string;
+}
+
+export interface UseGroveEventsOptions {
+  onBeeEvent?: (event: BeeEvent) => void;
+  onBeeRemoved?: (event: BeeRemovedEvent) => void;
 }
 
 export interface UseGroveEventsResult {
@@ -19,15 +39,80 @@ export interface UseGroveEventsResult {
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
-export function useGroveEvents(groveId: string): UseGroveEventsResult {
+function isBeeState(value: unknown): value is BeeState {
+  return typeof value === 'string' && (BEE_STATE_ORDER as readonly string[]).includes(value);
+}
+
+// Checked for parseability rather than a strict ISO-8601 format match: a
+// format regex would be brittle against legitimate server formatting
+// variation, while Date.parse is lenient enough to accept real instants
+// yet still reject non-dates like "banana" that would silently corrupt a
+// future chronological ordering (e.g. per-bee config history). An explicit
+// UTC/offset suffix is still required: a date-time without one (e.g.
+// "2024-06-01T00:15:00") is resolved in the viewer's local timezone, so
+// the same value would represent a different instant on different
+// machines and could never be globally ordered.
+function isTimestamp(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    !Number.isNaN(Date.parse(value)) &&
+    /Z$|[+-]\d{2}:\d{2}$/.test(value)
+  );
+}
+
+// JSON.parse succeeding only means the payload is syntactically valid JSON,
+// not that it matches the BeeEvent shape — the server (or a malicious/buggy
+// intermediary) could send a syntactically-valid payload missing fields or
+// carrying an unrecognized state, which would flow straight through to the
+// UI otherwise.
+function isValidBeeEventPayload(payload: unknown): payload is BeeEvent {
+  if (typeof payload !== 'object' || payload === null) return false;
+  const p = payload as Record<string, unknown>;
+  return (
+    typeof p.beeId === 'string' && p.beeId.length > 0 &&
+    typeof p.groveId === 'string' && p.groveId.length > 0 &&
+    isBeeState(p.previousState) &&
+    isBeeState(p.newState) &&
+    isTimestamp(p.changedAt)
+  );
+}
+
+function isValidBeeRemovedPayload(payload: unknown): payload is BeeRemovedEvent {
+  if (typeof payload !== 'object' || payload === null) return false;
+  const p = payload as Record<string, unknown>;
+  return (
+    typeof p.beeId === 'string' && p.beeId.length > 0 &&
+    typeof p.groveId === 'string' && p.groveId.length > 0 &&
+    isTimestamp(p.removedAt)
+  );
+}
+
+export function useGroveEvents(
+  groveId: string,
+  options?: UseGroveEventsOptions,
+): UseGroveEventsResult {
   const [event, setEvent] = useState<GroveEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(true);
   const retriesRef = useRef(0);
   const esRef = useRef<EventSource | null>(null);
+  const onBeeEventRef = useRef(options?.onBeeEvent);
+  const onBeeRemovedRef = useRef(options?.onBeeRemoved);
+
+  useEffect(() => {
+    onBeeEventRef.current = options?.onBeeEvent;
+    onBeeRemovedRef.current = options?.onBeeRemoved;
+  }, [options?.onBeeEvent, options?.onBeeRemoved]);
 
   useEffect(() => {
     let cancelled = false;
+
+    // Each groveId gets its own retry budget and connection state — carrying
+    // the previous grove's over would jump straight to the terminal error.
+    retriesRef.current = 0;
+    setEvent(null);
+    setError(null);
 
     function connect() {
       if (cancelled) return;
@@ -51,6 +136,36 @@ export function useGroveEvents(groveId: string): UseGroveEventsResult {
           retriesRef.current = 0;
           setConnecting(false);
           setError(null);
+        } catch {
+          // ignore malformed events
+        }
+      });
+
+      es.addEventListener('bee-state-changed', (e: MessageEvent) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (!isValidBeeEventPayload(payload)) return;
+          onBeeEventRef.current?.({
+            beeId: payload.beeId,
+            groveId: payload.groveId,
+            previousState: payload.previousState,
+            newState: payload.newState,
+            changedAt: payload.changedAt,
+          });
+        } catch {
+          // ignore malformed events
+        }
+      });
+
+      es.addEventListener('bee-removed', (e: MessageEvent) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (!isValidBeeRemovedPayload(payload)) return;
+          onBeeRemovedRef.current?.({
+            beeId: payload.beeId,
+            groveId: payload.groveId,
+            removedAt: payload.removedAt,
+          });
         } catch {
           // ignore malformed events
         }

@@ -17,7 +17,7 @@ import { Bot, Sparkles, Terminal, Code, Settings } from 'lucide-react';
 import Button from '@/components/common/Button';
 import BeeStateStepper from './BeeStateStepper';
 import BeeStatusChip from './BeeStatusChip';
-import { wakeBee, smokeBee } from '@/lib/api/bees';
+import { wakeBee, smokeBee, removeBee } from '@/lib/api/bees';
 import type { BeeResponse, BeeType } from '@/types/orchard';
 
 const ICON_MAP: Record<BeeType, React.ReactNode> = {
@@ -38,18 +38,30 @@ const TYPE_LABELS: Record<BeeType, string> = {
   CUSTOM: 'Custom',
 };
 
+const CONFIRM_COPY = {
+  smoke: {
+    title: 'Stop Bee',
+    body: 'This will stop the bee. You can wake it later.',
+  },
+  remove: {
+    title: 'Remove Bee',
+    body: 'This permanently removes the bee from the grove. This cannot be undone.',
+  },
+} as const;
+
 interface BeeCardProps {
   bee: BeeResponse;
   onAction: () => void;
 }
 
 export default function BeeCard({ bee, onAction }: BeeCardProps) {
-  const [confirmAction, setConfirmAction] = useState<'smoke' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'smoke' | 'remove' | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canWake = bee.state === 'HIBERNATING' || bee.state === 'SMOKED';
   const canSmoke = bee.state === 'BUZZING' || bee.state === 'POLLINATING';
+  const canRemove = bee.state === 'HIBERNATING' || bee.state === 'SMOKED';
 
   const handleAction = async (action: () => Promise<unknown>) => {
     setLoading(true);
@@ -71,6 +83,7 @@ export default function BeeCard({ bee, onAction }: BeeCardProps) {
 
   const handleWake = () => handleAction(() => wakeBee(bee.groveId, bee.id));
   const handleSmoke = () => handleAction(() => smokeBee(bee.groveId, bee.id));
+  const handleRemove = () => handleAction(() => removeBee(bee.groveId, bee.id));
 
   return (
     <>
@@ -103,21 +116,31 @@ export default function BeeCard({ bee, onAction }: BeeCardProps) {
               Stop
             </Button>
           )}
+          {canRemove && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => setConfirmAction('remove')}
+              disabled={loading}
+            >
+              Remove
+            </Button>
+          )}
         </CardActions>
       </Card>
 
       <Dialog open={confirmAction !== null} onClose={() => setConfirmAction(null)}>
-        <DialogTitle>Stop Bee</DialogTitle>
+        <DialogTitle>{CONFIRM_COPY[confirmAction ?? 'smoke'].title}</DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            This will stop the bee. You can wake it later.
-          </DialogContentText>
+          <DialogContentText>{CONFIRM_COPY[confirmAction ?? 'smoke'].body}</DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button variant="ghost" onClick={() => setConfirmAction(null)} disabled={loading}>Cancel</Button>
+          <Button variant="ghost" onClick={() => setConfirmAction(null)} disabled={loading}>
+            Cancel
+          </Button>
           <Button
             variant="danger"
-            onClick={handleSmoke}
+            onClick={confirmAction === 'remove' ? handleRemove : handleSmoke}
             disabled={loading}
           >
             {loading ? 'Working…' : 'Confirm'}
