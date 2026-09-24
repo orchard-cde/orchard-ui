@@ -153,6 +153,77 @@ test('ignores a bee-state-changed payload with an unparseable changedAt', () => 
   expect(onBeeEvent).not.toHaveBeenCalled();
 });
 
+test('ignores a bee-state-changed payload with an empty changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', { ...BEE_PAYLOAD, changedAt: '' });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with an offset-free changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', {
+      ...BEE_PAYLOAD,
+      changedAt: '2024-06-01T00:15:00',
+    });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with an invalid calendar date changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', { ...BEE_PAYLOAD, changedAt: '2024-02-30' });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with a year-only changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', { ...BEE_PAYLOAD, changedAt: '2024' });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('accepts a bee-state-changed payload with a nanosecond-precision changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  const payload = { ...BEE_PAYLOAD, changedAt: '2024-06-01T00:15:00.123456789Z' };
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', payload);
+  });
+
+  expect(onBeeEvent).toHaveBeenCalledWith(payload);
+});
+
+test('accepts a bee-state-changed payload with an explicit offset changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  const payload = { ...BEE_PAYLOAD, changedAt: '2024-06-01T00:15:00+02:00' };
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', payload);
+  });
+
+  expect(onBeeEvent).toHaveBeenCalledWith(payload);
+});
+
 test('does not require an onBeeEvent callback', () => {
   renderHook(() => useGroveEvents('grove-1'));
 
@@ -379,6 +450,66 @@ test('ignores a bee-removed payload with an unparseable removedAt', () => {
   });
 
   expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with an offset-free removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', {
+      ...REMOVED_PAYLOAD,
+      removedAt: '2024-06-01T00:15:00',
+    });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with an invalid calendar date removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt: '2024-02-30' });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with a year-only removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt: '2024' });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('accepts a bee-removed payload with a nanosecond-precision removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  const payload = { ...REMOVED_PAYLOAD, removedAt: '2024-06-01T00:15:00.123456789Z' };
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', payload);
+  });
+
+  expect(onBeeRemoved).toHaveBeenCalledWith(payload);
+});
+
+test('accepts a bee-removed payload with an explicit offset removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  const payload = { ...REMOVED_PAYLOAD, removedAt: '2024-06-01T00:15:00+02:00' };
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', payload);
+  });
+
+  expect(onBeeRemoved).toHaveBeenCalledWith(payload);
 });
 
 test('does not require an onBeeRemoved callback', () => {

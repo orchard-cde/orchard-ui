@@ -47,9 +47,18 @@ function isBeeState(value: unknown): value is BeeState {
 // format regex would be brittle against legitimate server formatting
 // variation, while Date.parse is lenient enough to accept real instants
 // yet still reject non-dates like "banana" that would silently corrupt a
-// future chronological ordering (e.g. per-bee config history).
+// future chronological ordering (e.g. per-bee config history). An explicit
+// UTC/offset suffix is still required: a date-time without one (e.g.
+// "2024-06-01T00:15:00") is resolved in the viewer's local timezone, so
+// the same value would represent a different instant on different
+// machines and could never be globally ordered.
 function isTimestamp(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && !Number.isNaN(Date.parse(value));
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    !Number.isNaN(Date.parse(value)) &&
+    /Z$|[+-]\d{2}:\d{2}$/.test(value)
+  );
 }
 
 // JSON.parse succeeding only means the payload is syntactically valid JSON,
