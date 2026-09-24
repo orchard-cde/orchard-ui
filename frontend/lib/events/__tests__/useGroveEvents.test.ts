@@ -119,6 +119,40 @@ test('ignores a bee-state-changed payload with a non-string beeId', () => {
   expect(onBeeEvent).not.toHaveBeenCalled();
 });
 
+test('ignores a bee-state-changed payload missing changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    const { changedAt, ...withoutChangedAt } = BEE_PAYLOAD;
+    MockEventSource.instances[0].emit('bee-state-changed', withoutChangedAt);
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with a non-string changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', { ...BEE_PAYLOAD, changedAt: 99 });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with an unparseable changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', { ...BEE_PAYLOAD, changedAt: 'banana' });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
 test('does not require an onBeeEvent callback', () => {
   renderHook(() => useGroveEvents('grove-1'));
 
@@ -297,6 +331,51 @@ test('ignores a bee-removed payload with an empty beeId', () => {
 
   act(() => {
     MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, beeId: '' });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload missing removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    const { removedAt, ...withoutRemovedAt } = REMOVED_PAYLOAD;
+    MockEventSource.instances[0].emit('bee-removed', withoutRemovedAt);
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with a non-string removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt: 42 });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with an empty removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt: '' });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with an unparseable removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt: 'banana' });
   });
 
   expect(onBeeRemoved).not.toHaveBeenCalled();

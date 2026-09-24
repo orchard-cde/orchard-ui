@@ -43,6 +43,15 @@ function isBeeState(value: unknown): value is BeeState {
   return typeof value === 'string' && (BEE_STATE_ORDER as readonly string[]).includes(value);
 }
 
+// Checked for parseability rather than a strict ISO-8601 format match: a
+// format regex would be brittle against legitimate server formatting
+// variation, while Date.parse is lenient enough to accept real instants
+// yet still reject non-dates like "banana" that would silently corrupt a
+// future chronological ordering (e.g. per-bee config history).
+function isTimestamp(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && !Number.isNaN(Date.parse(value));
+}
+
 // JSON.parse succeeding only means the payload is syntactically valid JSON,
 // not that it matches the BeeEvent shape — the server (or a malicious/buggy
 // intermediary) could send a syntactically-valid payload missing fields or
@@ -55,7 +64,8 @@ function isValidBeeEventPayload(payload: unknown): payload is BeeEvent {
     typeof p.beeId === 'string' && p.beeId.length > 0 &&
     typeof p.groveId === 'string' && p.groveId.length > 0 &&
     isBeeState(p.previousState) &&
-    isBeeState(p.newState)
+    isBeeState(p.newState) &&
+    isTimestamp(p.changedAt)
   );
 }
 
@@ -64,7 +74,8 @@ function isValidBeeRemovedPayload(payload: unknown): payload is BeeRemovedEvent 
   const p = payload as Record<string, unknown>;
   return (
     typeof p.beeId === 'string' && p.beeId.length > 0 &&
-    typeof p.groveId === 'string' && p.groveId.length > 0
+    typeof p.groveId === 'string' && p.groveId.length > 0 &&
+    isTimestamp(p.removedAt)
   );
 }
 
