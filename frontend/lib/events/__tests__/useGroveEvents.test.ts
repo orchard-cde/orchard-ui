@@ -178,7 +178,7 @@ test('ignores a bee-state-changed payload with an offset-free changedAt', () => 
   expect(onBeeEvent).not.toHaveBeenCalled();
 });
 
-test('ignores a bee-state-changed payload with an invalid calendar date changedAt', () => {
+test('ignores a bee-state-changed payload with a date-only changedAt', () => {
   const onBeeEvent = jest.fn();
   renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
 
@@ -187,6 +187,28 @@ test('ignores a bee-state-changed payload with an invalid calendar date changedA
   });
 
   expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+// Known limitation: the guard requires an explicit offset and a parseable value,
+// but Date.parse normalizes day-of-month overflow rather than rejecting it, so
+// 2024-02-30 becomes 2024-03-01. Month and hour overflow are still rejected,
+// because Date.parse returns NaN for those. The shipping backend serializes
+// java.time.Instant, which cannot express an invalid calendar date, so this is
+// only reachable from a non-conforming producer.
+test('accepts a day-overflow changedAt that carries an offset', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', {
+      ...BEE_PAYLOAD,
+      changedAt: '2024-02-30T00:00:00Z',
+    });
+  });
+
+  expect(onBeeEvent).toHaveBeenCalledWith(
+    expect.objectContaining({ changedAt: '2024-02-30T00:00:00Z' }),
+  );
 });
 
 test('ignores a bee-state-changed payload with a year-only changedAt', () => {
@@ -466,7 +488,7 @@ test('ignores a bee-removed payload with an offset-free removedAt', () => {
   expect(onBeeRemoved).not.toHaveBeenCalled();
 });
 
-test('ignores a bee-removed payload with an invalid calendar date removedAt', () => {
+test('ignores a bee-removed payload with a date-only removedAt', () => {
   const onBeeRemoved = jest.fn();
   renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
 
@@ -475,6 +497,39 @@ test('ignores a bee-removed payload with an invalid calendar date removedAt', ()
   });
 
   expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+// Same known limitation as the bee-state-changed case above.
+test('accepts a day-overflow removedAt that carries an offset', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', {
+      ...REMOVED_PAYLOAD,
+      removedAt: '2024-02-30T00:00:00Z',
+    });
+  });
+
+  expect(onBeeRemoved).toHaveBeenCalledWith(
+    expect.objectContaining({ removedAt: '2024-02-30T00:00:00Z' }),
+  );
+});
+
+// Month and hour overflow ARE rejected: Date.parse returns NaN for these, so the
+// guard's parseability check catches them even with a valid offset present.
+test('ignores a bee-removed payload with month or hour overflow despite an offset', () => {
+  for (const removedAt of ['2024-13-01T00:00:00Z', '2024-06-01T25:00:00Z']) {
+    MockEventSource.instances = [];
+    const onBeeRemoved = jest.fn();
+    renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+    act(() => {
+      MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt });
+    });
+
+    expect(onBeeRemoved).not.toHaveBeenCalled();
+  }
 });
 
 test('ignores a bee-removed payload with a year-only removedAt', () => {
