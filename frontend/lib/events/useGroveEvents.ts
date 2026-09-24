@@ -19,8 +19,15 @@ export interface BeeEvent {
   changedAt: string;
 }
 
+export interface BeeRemovedEvent {
+  beeId: string;
+  groveId: string;
+  removedAt: string;
+}
+
 export interface UseGroveEventsOptions {
   onBeeEvent?: (event: BeeEvent) => void;
+  onBeeRemoved?: (event: BeeRemovedEvent) => void;
 }
 
 export interface UseGroveEventsResult {
@@ -52,6 +59,15 @@ function isValidBeeEventPayload(payload: unknown): payload is BeeEvent {
   );
 }
 
+function isValidBeeRemovedPayload(payload: unknown): payload is BeeRemovedEvent {
+  if (typeof payload !== 'object' || payload === null) return false;
+  const p = payload as Record<string, unknown>;
+  return (
+    typeof p.beeId === 'string' && p.beeId.length > 0 &&
+    typeof p.groveId === 'string' && p.groveId.length > 0
+  );
+}
+
 export function useGroveEvents(
   groveId: string,
   options?: UseGroveEventsOptions,
@@ -62,10 +78,12 @@ export function useGroveEvents(
   const retriesRef = useRef(0);
   const esRef = useRef<EventSource | null>(null);
   const onBeeEventRef = useRef(options?.onBeeEvent);
+  const onBeeRemovedRef = useRef(options?.onBeeRemoved);
 
   useEffect(() => {
     onBeeEventRef.current = options?.onBeeEvent;
-  }, [options?.onBeeEvent]);
+    onBeeRemovedRef.current = options?.onBeeRemoved;
+  }, [options?.onBeeEvent, options?.onBeeRemoved]);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +131,20 @@ export function useGroveEvents(
             previousState: payload.previousState,
             newState: payload.newState,
             changedAt: payload.changedAt,
+          });
+        } catch {
+          // ignore malformed events
+        }
+      });
+
+      es.addEventListener('bee-removed', (e: MessageEvent) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (!isValidBeeRemovedPayload(payload)) return;
+          onBeeRemovedRef.current?.({
+            beeId: payload.beeId,
+            groveId: payload.groveId,
+            removedAt: payload.removedAt,
           });
         } catch {
           // ignore malformed events

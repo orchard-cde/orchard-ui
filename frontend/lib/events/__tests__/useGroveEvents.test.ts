@@ -40,6 +40,12 @@ const BEE_PAYLOAD = {
   changedAt: '2024-06-01T00:00:00Z',
 };
 
+const REMOVED_PAYLOAD = {
+  beeId: 'bee-1',
+  groveId: 'grove-1',
+  removedAt: '2024-06-01T00:00:00Z',
+};
+
 beforeEach(() => {
   MockEventSource.instances = [];
   (global as unknown as { EventSource: unknown }).EventSource = MockEventSource;
@@ -143,12 +149,13 @@ test('still reports grove-state-changed on the result', () => {
   });
 });
 
-test('registers both listeners on a single EventSource', () => {
-  renderHook(() => useGroveEvents('grove-1', { onBeeEvent: jest.fn() }));
+test('registers all three listeners on a single EventSource', () => {
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent: jest.fn(), onBeeRemoved: jest.fn() }));
 
   expect(MockEventSource.instances).toHaveLength(1);
   expect(MockEventSource.instances[0].listeners['grove-state-changed']).toHaveLength(1);
   expect(MockEventSource.instances[0].listeners['bee-state-changed']).toHaveLength(1);
+  expect(MockEventSource.instances[0].listeners['bee-removed']).toHaveLength(1);
 });
 
 test('re-attaches the bee listener after a reconnect', () => {
@@ -225,4 +232,102 @@ test('a changing onBeeEvent identity does not rebuild the EventSource', () => {
 
   expect(second).toHaveBeenCalledWith(BEE_PAYLOAD);
   expect(first).not.toHaveBeenCalled();
+});
+
+test('passes a bee-removed payload to onBeeRemoved', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', REMOVED_PAYLOAD);
+  });
+
+  expect(onBeeRemoved).toHaveBeenCalledTimes(1);
+  expect(onBeeRemoved).toHaveBeenCalledWith(REMOVED_PAYLOAD);
+});
+
+test('ignores a syntactically invalid bee-removed payload', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', 'not json{');
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a null bee-removed payload', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', null);
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload missing groveId', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    const { groveId, ...withoutGroveId } = REMOVED_PAYLOAD;
+    MockEventSource.instances[0].emit('bee-removed', withoutGroveId);
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with a non-string beeId', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, beeId: 42 });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with an empty beeId', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, beeId: '' });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('does not require an onBeeRemoved callback', () => {
+  renderHook(() => useGroveEvents('grove-1'));
+
+  expect(() => {
+    act(() => {
+      MockEventSource.instances[0].emit('bee-removed', REMOVED_PAYLOAD);
+    });
+  }).not.toThrow();
+});
+
+test('re-attaches the bee-removed listener after a reconnect', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].onerror?.();
+  });
+  act(() => {
+    jest.advanceTimersByTime(1000);
+  });
+
+  expect(MockEventSource.instances).toHaveLength(2);
+
+  act(() => {
+    MockEventSource.instances[1].emit('bee-removed', REMOVED_PAYLOAD);
+  });
+
+  expect(onBeeRemoved).toHaveBeenCalledWith(REMOVED_PAYLOAD);
 });

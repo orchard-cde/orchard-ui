@@ -95,6 +95,7 @@ const hibernatingBee = {
 };
 
 let capturedOnBeeEvent: ((e: any) => void) | undefined;
+let capturedOnBeeRemoved: ((e: any) => void) | undefined;
 let capturedOnAction: (() => void) | undefined;
 
 beforeEach(() => {
@@ -103,9 +104,11 @@ beforeEach(() => {
   (getSshConfig as jest.Mock).mockResolvedValue('ssh-ed25519 AAA...');
   (listBees as jest.Mock).mockResolvedValue([]);
   capturedOnBeeEvent = undefined;
+  capturedOnBeeRemoved = undefined;
   capturedOnAction = undefined;
   (useGroveEvents as jest.Mock).mockImplementation((_groveId: string, opts?: any) => {
     capturedOnBeeEvent = opts?.onBeeEvent;
+    capturedOnBeeRemoved = opts?.onBeeRemoved;
     return { event: null, error: null, connecting: false };
   });
 });
@@ -559,5 +562,178 @@ test('a patch recorded while idle does not overlay a later, fresher fetch', asyn
 
   await waitFor(() => {
     expect(screen.getByTestId('bee-bee-1')).toHaveTextContent('BUZZING');
+  });
+});
+
+test('a bee-removed event drops that card and leaves others', async () => {
+  (listBees as jest.Mock).mockResolvedValue([buzzingBee, hibernatingBee]);
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-1')).toBeInTheDocument();
+    expect(screen.getByTestId('bee-bee-2')).toBeInTheDocument();
+  });
+
+  act(() => {
+    capturedOnBeeRemoved?.({
+      beeId: 'bee-1',
+      groveId: 'test-id',
+      removedAt: '2024-06-01T00:03:00Z',
+    });
+  });
+
+  await waitFor(() => {
+    expect(screen.queryByTestId('bee-bee-1')).not.toBeInTheDocument();
+  });
+  expect(screen.getByTestId('bee-bee-2')).toBeInTheDocument();
+});
+
+test('a bee-removed event updates the total and state chips', async () => {
+  (listBees as jest.Mock).mockResolvedValue([buzzingBee, hibernatingBee]);
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('2 total')).toBeInTheDocument();
+  });
+
+  act(() => {
+    capturedOnBeeRemoved?.({
+      beeId: 'bee-1',
+      groveId: 'test-id',
+      removedAt: '2024-06-01T00:03:00Z',
+    });
+  });
+
+  await waitFor(() => {
+    expect(screen.getByText('1 total')).toBeInTheDocument();
+  });
+  expect(screen.queryByText('1 buzzing')).not.toBeInTheDocument();
+  expect(screen.getByText('1 hibernating')).toBeInTheDocument();
+});
+
+test('a bee-removed event for an unknown beeId is a no-op', async () => {
+  (listBees as jest.Mock).mockResolvedValue([buzzingBee]);
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-1')).toBeInTheDocument();
+  });
+
+  act(() => {
+    capturedOnBeeRemoved?.({
+      beeId: 'bee-unknown',
+      groveId: 'test-id',
+      removedAt: '2024-06-01T00:03:00Z',
+    });
+  });
+
+  expect(screen.getByTestId('bee-bee-1')).toBeInTheDocument();
+  expect(screen.getByText('1 total')).toBeInTheDocument();
+});
+
+test('removing the last bee shows the empty state', async () => {
+  (listBees as jest.Mock).mockResolvedValue([buzzingBee]);
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-1')).toBeInTheDocument();
+  });
+
+  act(() => {
+    capturedOnBeeRemoved?.({
+      beeId: 'bee-1',
+      groveId: 'test-id',
+      removedAt: '2024-06-01T00:03:00Z',
+    });
+  });
+
+  await waitFor(() => {
+    expect(screen.getByText(/No bees attached/)).toBeInTheDocument();
+  });
+  expect(screen.queryByTestId('bee-bee-1')).not.toBeInTheDocument();
+});
+
+test('a removal during an in-flight fetch holds after that fetch lands with the bee present', async () => {
+  const resolvers: Array<(bees: any[]) => void> = [];
+  (listBees as jest.Mock).mockImplementation(
+    () => new Promise((resolve) => { resolvers.push(resolve); }),
+  );
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(1));
+  await act(async () => { resolvers[0]([buzzingBee]); });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-1')).toBeInTheDocument();
+  });
+
+  act(() => { capturedOnAction?.(); });
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(2));
+
+  act(() => {
+    capturedOnBeeRemoved?.({
+      beeId: 'bee-1',
+      groveId: 'test-id',
+      removedAt: '2024-06-01T00:03:00Z',
+    });
+  });
+
+  // The in-flight refetch resolves with the bee still present (its server
+  // snapshot predates the delete). The removal must still hold.
+  await act(async () => { resolvers[1]([buzzingBee]); });
+
+  await waitFor(() => {
+    expect(screen.queryByTestId('bee-bee-1')).not.toBeInTheDocument();
+  });
+  expect(screen.getByText(/No bees attached/)).toBeInTheDocument();
+});
+
+test('a pending patch for a removed bee does not resurrect it', async () => {
+  const resolvers: Array<(bees: any[]) => void> = [];
+  (listBees as jest.Mock).mockImplementation(
+    () => new Promise((resolve) => { resolvers.push(resolve); }),
+  );
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(1));
+  await act(async () => { resolvers[0]([buzzingBee]); });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('bee-bee-1')).toHaveTextContent('BUZZING');
+  });
+
+  act(() => { capturedOnAction?.(); });
+  await waitFor(() => expect(listBees).toHaveBeenCalledTimes(2));
+
+  act(() => {
+    capturedOnBeeEvent?.({
+      beeId: 'bee-1',
+      groveId: 'test-id',
+      previousState: 'BUZZING',
+      newState: 'POLLINATING',
+      changedAt: '2024-06-01T00:02:00Z',
+    });
+  });
+
+  act(() => {
+    capturedOnBeeRemoved?.({
+      beeId: 'bee-1',
+      groveId: 'test-id',
+      removedAt: '2024-06-01T00:03:00Z',
+    });
+  });
+
+  // The stale refetch resolves with the bee still present, pre-removal.
+  // Neither the leftover patch nor the stale server snapshot may bring it back.
+  await act(async () => { resolvers[1]([buzzingBee]); });
+
+  await waitFor(() => {
+    expect(screen.queryByTestId('bee-bee-1')).not.toBeInTheDocument();
   });
 });

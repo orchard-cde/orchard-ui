@@ -19,7 +19,7 @@ import SshConfigBlock from '@/components/groves/SshConfigBlock';
 import StatusChip from '@/components/groves/StatusChip';
 import { getGrove, getSshConfig, stopGrove } from '@/lib/api/groves';
 import { listBees } from '@/lib/api/bees';
-import { useGroveEvents, type BeeEvent } from '@/lib/events/useGroveEvents';
+import { useGroveEvents, type BeeEvent, type BeeRemovedEvent } from '@/lib/events/useGroveEvents';
 import type { GroveResponse, GroveState, ApiError, BeeResponse, BeeState } from '@/types/orchard';
 import { BEE_STATE_ORDER } from '@/types/orchard';
 
@@ -47,11 +47,13 @@ export default function GroveDetailView() {
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
 
   // fetchGenerationRef ensures only the most recently issued fetchBees()
-  // commits. pendingPatchesRef holds SSE patches recorded since the last
-  // committed fetch, so a fetch that lands after a patch (even for a bee
-  // not yet in its own snapshot) can overlay it instead of discarding it.
+  // commits. pendingPatchesRef/pendingRemovalsRef hold SSE patches and
+  // removals recorded since the last dispatched fetch, so a fetch that
+  // lands after one (even for a bee not yet in its own snapshot) can
+  // overlay/filter it instead of discarding it.
   const fetchGenerationRef = useRef(0);
   const pendingPatchesRef = useRef<Map<string, BeeState>>(new Map());
+  const pendingRemovalsRef = useRef<Set<string>>(new Set());
 
   const handleBeeEvent = useCallback((e: BeeEvent) => {
     pendingPatchesRef.current.set(e.beeId, e.newState);
@@ -60,8 +62,15 @@ export default function GroveDetailView() {
     );
   }, []);
 
+  const handleBeeRemoved = useCallback((e: BeeRemovedEvent) => {
+    pendingPatchesRef.current.delete(e.beeId);
+    pendingRemovalsRef.current.add(e.beeId);
+    setBees((prev) => prev.filter((b) => b.id !== e.beeId));
+  }, []);
+
   const { event: sseEvent, error: sseError, connecting } = useGroveEvents(groveId, {
     onBeeEvent: handleBeeEvent,
+    onBeeRemoved: handleBeeRemoved,
   });
   const isFlourishing = currentState === 'FLOURISHING';
 
@@ -88,23 +97,29 @@ export default function GroveDetailView() {
 
   const fetchBees = () => {
     const requestId = ++fetchGenerationRef.current;
-    // Only patches that arrive between this dispatch and its own response
-    // should be preserved. Any patch recorded before now — including one
-    // still unresolved from an earlier, now-superseded fetch — is guaranteed
-    // to already be reflected in this request's server response, since the
+    // Only patches/removals that arrive between this dispatch and its own
+    // response should be preserved. Anything recorded before now —
+    // including from an earlier, now-superseded fetch — is guaranteed to
+    // already be reflected in this request's server response, since the
     // SSE notification for it fires only after the server-side write, which
     // happens before this dispatch.
     pendingPatchesRef.current.clear();
+    pendingRemovalsRef.current.clear();
     setBeeLoading(true);
     setBeeError(null);
     listBees(groveId)
       .then((data) => {
         if (fetchGenerationRef.current !== requestId) return;
         const patches = pendingPatchesRef.current;
-        const merged = patches.size === 0
+        const removals = pendingRemovalsRef.current;
+        let merged = patches.size === 0
           ? data
           : data.map((b) => (patches.has(b.id) ? { ...b, state: patches.get(b.id)! } : b));
+        if (removals.size > 0) {
+          merged = merged.filter((b) => !removals.has(b.id));
+        }
         patches.clear();
+        removals.clear();
         setBees(merged);
       })
       .catch((e: ApiError) => {
