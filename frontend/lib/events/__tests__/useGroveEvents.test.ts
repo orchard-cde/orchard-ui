@@ -1,0 +1,598 @@
+import { renderHook, act } from '@testing-library/react';
+import { useGroveEvents } from '../useGroveEvents';
+
+jest.mock('@/lib/auth', () => ({
+  getCultivatorId: jest.fn(() => 'cult-1'),
+}));
+
+type Listener = (e: MessageEvent) => void;
+
+class MockEventSource {
+  static instances: MockEventSource[] = [];
+  listeners: Record<string, Listener[]> = {};
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  closed = false;
+
+  constructor(public url: string) {
+    MockEventSource.instances.push(this);
+  }
+
+  addEventListener(type: string, fn: Listener) {
+    (this.listeners[type] ||= []).push(fn);
+  }
+
+  close() {
+    this.closed = true;
+  }
+
+  emit(type: string, data: unknown) {
+    const raw = typeof data === 'string' ? data : JSON.stringify(data);
+    (this.listeners[type] ?? []).forEach((fn) => fn({ data: raw } as MessageEvent));
+  }
+}
+
+const BEE_PAYLOAD = {
+  beeId: 'bee-1',
+  groveId: 'grove-1',
+  previousState: 'HIBERNATING',
+  newState: 'BUZZING',
+  changedAt: '2024-06-01T00:00:00Z',
+};
+
+const REMOVED_PAYLOAD = {
+  beeId: 'bee-1',
+  groveId: 'grove-1',
+  removedAt: '2024-06-01T00:00:00Z',
+};
+
+beforeEach(() => {
+  MockEventSource.instances = [];
+  (global as unknown as { EventSource: unknown }).EventSource = MockEventSource;
+  jest.useFakeTimers();
+});
+
+afterEach(() => {
+  jest.useRealTimers();
+});
+
+test('passes a bee-state-changed payload to onBeeEvent', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', BEE_PAYLOAD);
+  });
+
+  expect(onBeeEvent).toHaveBeenCalledTimes(1);
+  expect(onBeeEvent).toHaveBeenCalledWith(BEE_PAYLOAD);
+});
+
+test('ignores a syntactically invalid bee-state-changed payload', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', 'not json{');
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload missing groveId', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    const { groveId, ...withoutGroveId } = BEE_PAYLOAD;
+    MockEventSource.instances[0].emit('bee-state-changed', withoutGroveId);
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with an invalid newState', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', {
+      ...BEE_PAYLOAD,
+      newState: 'NOT_A_STATE',
+    });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with a non-string beeId', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', {
+      ...BEE_PAYLOAD,
+      beeId: 42,
+    });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload missing changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    const { changedAt, ...withoutChangedAt } = BEE_PAYLOAD;
+    MockEventSource.instances[0].emit('bee-state-changed', withoutChangedAt);
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with a non-string changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', { ...BEE_PAYLOAD, changedAt: 99 });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with an unparseable changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', { ...BEE_PAYLOAD, changedAt: 'banana' });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with an empty changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', { ...BEE_PAYLOAD, changedAt: '' });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with an offset-free changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', {
+      ...BEE_PAYLOAD,
+      changedAt: '2024-06-01T00:15:00',
+    });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-state-changed payload with a date-only changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', { ...BEE_PAYLOAD, changedAt: '2024-02-30' });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+// Known limitation: the guard requires an explicit offset and a parseable value,
+// but Date.parse normalizes day-of-month overflow rather than rejecting it, so
+// 2024-02-30 becomes 2024-03-01. Month and hour overflow are still rejected,
+// because Date.parse returns NaN for those. The shipping backend serializes
+// java.time.Instant, which cannot express an invalid calendar date, so this is
+// only reachable from a non-conforming producer.
+test('accepts a day-overflow changedAt that carries an offset', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', {
+      ...BEE_PAYLOAD,
+      changedAt: '2024-02-30T00:00:00Z',
+    });
+  });
+
+  expect(onBeeEvent).toHaveBeenCalledWith(
+    expect.objectContaining({ changedAt: '2024-02-30T00:00:00Z' }),
+  );
+});
+
+test('ignores a bee-state-changed payload with a year-only changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', { ...BEE_PAYLOAD, changedAt: '2024' });
+  });
+
+  expect(onBeeEvent).not.toHaveBeenCalled();
+});
+
+test('accepts a bee-state-changed payload with a nanosecond-precision changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  const payload = { ...BEE_PAYLOAD, changedAt: '2024-06-01T00:15:00.123456789Z' };
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', payload);
+  });
+
+  expect(onBeeEvent).toHaveBeenCalledWith(payload);
+});
+
+test('accepts a bee-state-changed payload with an explicit offset changedAt', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  const payload = { ...BEE_PAYLOAD, changedAt: '2024-06-01T00:15:00+02:00' };
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', payload);
+  });
+
+  expect(onBeeEvent).toHaveBeenCalledWith(payload);
+});
+
+test('does not require an onBeeEvent callback', () => {
+  renderHook(() => useGroveEvents('grove-1'));
+
+  expect(() => {
+    act(() => {
+      MockEventSource.instances[0].emit('bee-state-changed', BEE_PAYLOAD);
+    });
+  }).not.toThrow();
+});
+
+test('still reports grove-state-changed on the result', () => {
+  const { result } = renderHook(() => useGroveEvents('grove-1', { onBeeEvent: jest.fn() }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('grove-state-changed', {
+      groveId: 'grove-1',
+      groveName: 'Test Grove',
+      previousState: 'GROWING',
+      newState: 'FLOURISHING',
+      changedAt: '2024-06-01T00:00:00Z',
+    });
+  });
+
+  expect(result.current.event).toEqual({
+    newState: 'FLOURISHING',
+    previousState: 'GROWING',
+    changedAt: '2024-06-01T00:00:00Z',
+  });
+});
+
+test('registers all three listeners on a single EventSource', () => {
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent: jest.fn(), onBeeRemoved: jest.fn() }));
+
+  expect(MockEventSource.instances).toHaveLength(1);
+  expect(MockEventSource.instances[0].listeners['grove-state-changed']).toHaveLength(1);
+  expect(MockEventSource.instances[0].listeners['bee-state-changed']).toHaveLength(1);
+  expect(MockEventSource.instances[0].listeners['bee-removed']).toHaveLength(1);
+});
+
+test('re-attaches the bee listener after a reconnect', () => {
+  const onBeeEvent = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeEvent }));
+
+  act(() => {
+    MockEventSource.instances[0].onerror?.();
+  });
+  act(() => {
+    jest.advanceTimersByTime(1000);
+  });
+
+  expect(MockEventSource.instances).toHaveLength(2);
+
+  act(() => {
+    MockEventSource.instances[1].emit('bee-state-changed', BEE_PAYLOAD);
+  });
+
+  expect(onBeeEvent).toHaveBeenCalledWith(BEE_PAYLOAD);
+});
+
+test('resets the retry budget and error when groveId changes', () => {
+  const { result, rerender } = renderHook(
+    ({ groveId }: { groveId: string }) => useGroveEvents(groveId),
+    { initialProps: { groveId: 'grove-a' } },
+  );
+
+  // Exhaust grove A's retry budget (MAX_RETRIES = 3).
+  act(() => { MockEventSource.instances[0].onerror?.(); });
+  act(() => { jest.advanceTimersByTime(1000); });
+  act(() => { MockEventSource.instances[1].onerror?.(); });
+  act(() => { jest.advanceTimersByTime(2000); });
+  act(() => { MockEventSource.instances[2].onerror?.(); });
+  act(() => { jest.advanceTimersByTime(4000); });
+  act(() => { MockEventSource.instances[3].onerror?.(); });
+
+  expect(result.current.error).toBe('Lost connection to grove. Please refresh.');
+  expect(MockEventSource.instances).toHaveLength(4);
+
+  rerender({ groveId: 'grove-b' });
+
+  expect(MockEventSource.instances).toHaveLength(5);
+  expect(result.current.error).toBeNull();
+
+  // Grove B's first error should get its own retry budget, not go straight
+  // to terminal because of A's exhausted retriesRef.
+  act(() => { MockEventSource.instances[4].onerror?.(); });
+
+  expect(result.current.error).toBeNull();
+
+  act(() => { jest.advanceTimersByTime(1000); });
+
+  expect(MockEventSource.instances).toHaveLength(6);
+});
+
+test('a changing onBeeEvent identity does not rebuild the EventSource', () => {
+  const first = jest.fn();
+  const { rerender } = renderHook(
+    ({ cb }: { cb: () => void }) => useGroveEvents('grove-1', { onBeeEvent: cb }),
+    { initialProps: { cb: first } },
+  );
+
+  expect(MockEventSource.instances).toHaveLength(1);
+
+  const second = jest.fn();
+  rerender({ cb: second });
+
+  expect(MockEventSource.instances).toHaveLength(1);
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-state-changed', BEE_PAYLOAD);
+  });
+
+  expect(second).toHaveBeenCalledWith(BEE_PAYLOAD);
+  expect(first).not.toHaveBeenCalled();
+});
+
+test('passes a bee-removed payload to onBeeRemoved', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', REMOVED_PAYLOAD);
+  });
+
+  expect(onBeeRemoved).toHaveBeenCalledTimes(1);
+  expect(onBeeRemoved).toHaveBeenCalledWith(REMOVED_PAYLOAD);
+});
+
+test('ignores a syntactically invalid bee-removed payload', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', 'not json{');
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a null bee-removed payload', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', null);
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload missing groveId', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    const { groveId, ...withoutGroveId } = REMOVED_PAYLOAD;
+    MockEventSource.instances[0].emit('bee-removed', withoutGroveId);
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with a non-string beeId', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, beeId: 42 });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with an empty beeId', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, beeId: '' });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload missing removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    const { removedAt, ...withoutRemovedAt } = REMOVED_PAYLOAD;
+    MockEventSource.instances[0].emit('bee-removed', withoutRemovedAt);
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with a non-string removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt: 42 });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with an empty removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt: '' });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with an unparseable removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt: 'banana' });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with an offset-free removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', {
+      ...REMOVED_PAYLOAD,
+      removedAt: '2024-06-01T00:15:00',
+    });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('ignores a bee-removed payload with a date-only removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt: '2024-02-30' });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+// Same known limitation as the bee-state-changed case above.
+test('accepts a day-overflow removedAt that carries an offset', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', {
+      ...REMOVED_PAYLOAD,
+      removedAt: '2024-02-30T00:00:00Z',
+    });
+  });
+
+  expect(onBeeRemoved).toHaveBeenCalledWith(
+    expect.objectContaining({ removedAt: '2024-02-30T00:00:00Z' }),
+  );
+});
+
+// Month and hour overflow ARE rejected: Date.parse returns NaN for these, so the
+// guard's parseability check catches them even with a valid offset present.
+test('ignores a bee-removed payload with month or hour overflow despite an offset', () => {
+  for (const removedAt of ['2024-13-01T00:00:00Z', '2024-06-01T25:00:00Z']) {
+    MockEventSource.instances = [];
+    const onBeeRemoved = jest.fn();
+    renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+    act(() => {
+      MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt });
+    });
+
+    expect(onBeeRemoved).not.toHaveBeenCalled();
+  }
+});
+
+test('ignores a bee-removed payload with a year-only removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', { ...REMOVED_PAYLOAD, removedAt: '2024' });
+  });
+
+  expect(onBeeRemoved).not.toHaveBeenCalled();
+});
+
+test('accepts a bee-removed payload with a nanosecond-precision removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  const payload = { ...REMOVED_PAYLOAD, removedAt: '2024-06-01T00:15:00.123456789Z' };
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', payload);
+  });
+
+  expect(onBeeRemoved).toHaveBeenCalledWith(payload);
+});
+
+test('accepts a bee-removed payload with an explicit offset removedAt', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  const payload = { ...REMOVED_PAYLOAD, removedAt: '2024-06-01T00:15:00+02:00' };
+  act(() => {
+    MockEventSource.instances[0].emit('bee-removed', payload);
+  });
+
+  expect(onBeeRemoved).toHaveBeenCalledWith(payload);
+});
+
+test('does not require an onBeeRemoved callback', () => {
+  renderHook(() => useGroveEvents('grove-1'));
+
+  expect(() => {
+    act(() => {
+      MockEventSource.instances[0].emit('bee-removed', REMOVED_PAYLOAD);
+    });
+  }).not.toThrow();
+});
+
+test('re-attaches the bee-removed listener after a reconnect', () => {
+  const onBeeRemoved = jest.fn();
+  renderHook(() => useGroveEvents('grove-1', { onBeeRemoved }));
+
+  act(() => {
+    MockEventSource.instances[0].onerror?.();
+  });
+  act(() => {
+    jest.advanceTimersByTime(1000);
+  });
+
+  expect(MockEventSource.instances).toHaveLength(2);
+
+  act(() => {
+    MockEventSource.instances[1].emit('bee-removed', REMOVED_PAYLOAD);
+  });
+
+  expect(onBeeRemoved).toHaveBeenCalledWith(REMOVED_PAYLOAD);
+});
