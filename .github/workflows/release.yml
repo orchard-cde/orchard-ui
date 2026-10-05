@@ -52,7 +52,7 @@ jobs:
           fi
 
       - name: Set up GraalVM JDK 25
-        uses: graalvm/setup-graalvm@5298d94fb55a4f185c602eeac5de1b553882abe2  # v1
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276  # v1
         with:
           java-version: '25'
           distribution: 'graalvm-community'
@@ -106,7 +106,7 @@ jobs:
         run: sha256sum *.tar.gz > checksums-sha256.txt
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3
         with:
           generate_release_notes: true
           files: |
