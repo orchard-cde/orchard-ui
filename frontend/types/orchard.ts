@@ -65,6 +65,14 @@ export type BeeState =
   | 'POLLINATING'
   | 'SMOKED';
 
+export const BEE_STATE_ORDER: readonly BeeState[] = [
+  'HATCHING',
+  'HIBERNATING',
+  'BUZZING',
+  'POLLINATING',
+  'SMOKED',
+];
+
 export type BeeType =
   | 'CLAUDE_CODE'
   | 'GEMINI'
