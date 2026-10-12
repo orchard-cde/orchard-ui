@@ -4,6 +4,9 @@
 # Windows batch files use CRLF
 *.bat text eol=crlf
 
+# Stored verbatim: Dependabot commits CRLF via the GitHub API, bypassing normalization
+gradlew.bat -text
+
 # Source files
 *.ts text eol=lf
 *.tsx text eol=lf
