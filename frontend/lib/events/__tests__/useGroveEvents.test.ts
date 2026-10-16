@@ -1,10 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { useGroveEvents } from '../useGroveEvents';
 
-jest.mock('@/lib/auth', () => ({
-  getCultivatorId: jest.fn(() => 'cult-1'),
-}));
-
 type Listener = (e: MessageEvent) => void;
 
 class MockEventSource {
@@ -54,6 +50,12 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers();
+});
+
+test('opens the grove event stream without a cultivator query param', () => {
+  renderHook(() => useGroveEvents('grove-1'));
+
+  expect(MockEventSource.instances[0].url).toMatch(/\/api\/groves\/grove-1\/events$/);
 });
 
 test('passes a bee-state-changed payload to onBeeEvent', () => {

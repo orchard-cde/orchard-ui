@@ -69,10 +69,10 @@ class ApiProxyIntegrationTest {
     void customRequestHeaderIsForwarded() throws Exception {
         var resp = client.send(
             HttpRequest.newBuilder(URI.create("http://localhost:" + backendPort + "/api/echo-header"))
-                .header("X-Cultivator-Id", "cultivator-42").GET().build(),
+                .header("Authorization", "Bearer test-token").GET().build(),
             HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode()).isEqualTo(200);
-        assertThat(resp.body()).isEqualTo("cultivator-42");
+        assertThat(resp.body()).isEqualTo("Bearer test-token");
     }
 
     @Test
