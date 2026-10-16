@@ -124,9 +124,9 @@ dependency-management, and GraalVM native-image plugin versions track orchard co
 
 The proxy must satisfy two transport shapes the UI actually uses:
 
-- **REST** via axios on `/api/**`, carrying an `X-Cultivator-Id` request header, with a `401`
-  response driving a client-side redirect to `/unauthorized`. The proxy must pass request headers
-  and response status through transparently.
+- **REST** via axios on `/api/**` (no credential attached today), with a `401` response driving a
+  client-side redirect to `/unauthorized`. The proxy must pass request headers and response status
+  through transparently.
 - **Server-Sent Events** via `EventSource` on `/api/groves/{id}/events`
   (`text/event-stream`, long-lived). The proxy must **stream** the response — a buffer-and-forward
   proxy breaks SSE.
@@ -136,7 +136,7 @@ The proxy must satisfy two transport shapes the UI actually uses:
 > [§3](#3-component-placement-and-build)), native-image cleanliness is the deciding criterion. The
 > primary proxy is a catch-all `@RequestMapping("/api/**")` controller using `RestClient` whose
 > upstream response `InputStream` is piped into a `StreamingResponseBody` — it preserves SSE
-> streaming, passes request headers (incl. `X-Cultivator-Id`) and response status through, and is
+> streaming, passes request headers (incl. `Authorization`) and response status through, and is
 > trivially native-image friendly (no reflection-heavy machinery). The servlet variant of Spring
 > Cloud Gateway (`spring-cloud-starter-gateway-server-webmvc`, BOM `2025.1.2`, which supports
 > Spring Boot 4.1.0) is a viable alternative — it gives SSE streaming and header/status passthrough

@@ -21,8 +21,8 @@ public class StubCoreApplication {
     }
 
     @GetMapping("/api/echo-header")
-    String echoHeader(@RequestHeader("X-Cultivator-Id") String id) {
-        return id;
+    String echoHeader(@RequestHeader("Authorization") String authorization) {
+        return authorization;
     }
 
     @GetMapping(value = "/api/groves/{id}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

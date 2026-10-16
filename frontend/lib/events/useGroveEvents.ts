@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GroveState, BeeState } from '@/types/orchard';
 import { BEE_STATE_ORDER } from '@/types/orchard';
-import { getCultivatorId } from '@/lib/auth';
 
 export interface GroveEvent {
   newState: GroveState;
@@ -114,12 +113,11 @@ export function useGroveEvents(
     setEvent(null);
     setError(null);
 
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
+    const url = `${baseUrl}/api/groves/${encodeURIComponent(groveId)}/events`;
+
     function connect() {
       if (cancelled) return;
-
-      const cultivatorId = getCultivatorId();
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
-      const url = `${baseUrl}/api/groves/${encodeURIComponent(groveId)}/events${cultivatorId ? `?cultivatorId=${encodeURIComponent(cultivatorId)}` : ''}`;
 
       setConnecting(true);
       const es = new EventSource(url);

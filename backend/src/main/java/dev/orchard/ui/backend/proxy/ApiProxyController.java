@@ -19,7 +19,7 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Reverse-proxies every method on /api/** to orchard core, streaming the response so SSE
- * (text/event-stream) is delivered incrementally. Request headers (incl. X-Cultivator-Id) and
+ * (text/event-stream) is delivered incrementally. Request headers (incl. Authorization) and
  * the response status are passed through; hop-by-hop headers are dropped (spec D4).
  */
 @RestController

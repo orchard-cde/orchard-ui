@@ -18,11 +18,8 @@ export default function UnauthorizedPage() {
       <Typography variant="h4">Not Authenticated</Typography>
       <Alert severity="info" sx={{ maxWidth: 480 }}>
         <Typography variant="body2">
-          You are not authenticated. In dev mode, set your cultivator ID in{' '}
-          <code>localStorage</code> under the key{' '}
-          <code>orchard_cultivator_id</code>, or set{' '}
-          <code>NEXT_PUBLIC_CULTIVATOR_ID</code> in your{' '}
-          <code>.env.local</code> file.
+          Browser sign-in is not available yet. For local development, start
+          the dev server with <code>trowel dev-server start --no-auth</code>.
         </Typography>
       </Alert>
     </Box>
