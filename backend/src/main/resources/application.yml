@@ -3,6 +3,7 @@ server:
   servlet:
     session:
       cookie:
+        name: ORCHARD_UI_SESSION
         http-only: true
         same-site: lax
         secure: ${ORCHARD_SESSION_COOKIE_SECURE:false}
