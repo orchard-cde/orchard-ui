@@ -27,4 +27,17 @@ class SessionControllerAuthOffTest {
         assertThat(response.body()).isEqualTo("{\"enabled\":false,\"authenticated\":false}");
         assertThat(response.headers().allValues("Set-Cookie")).isEmpty();
     }
+
+    @Test
+    void logoutIsNotInterceptedByLoginRedirect() throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        for (String method : new String[] {"GET", "POST"}) {
+            HttpResponse<String> response = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/logout"))
+                    .method(method, HttpRequest.BodyPublishers.noBody()).build(),
+                HttpResponse.BodyHandlers.ofString());
+
+            assertThat(response.headers().firstValue("Location").orElse("")).doesNotContain("/login");
+        }
+    }
 }

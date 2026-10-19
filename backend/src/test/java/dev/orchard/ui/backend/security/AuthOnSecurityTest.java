@@ -9,7 +9,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.web.client.ResourceAccessException;
 
 import jakarta.servlet.http.Cookie;
 
@@ -83,25 +82,18 @@ class AuthOnSecurityTest {
     }
 
     @Test
-    void postWithHeaderCsrfPasses() throws Exception {
-        int status;
-        try {
-            status = mvc.perform(post("/api/groves")
-                    .with(oidcLogin().clientRegistration(TestFenceRegistrations.FENCE))
-                    .cookie(new Cookie("XSRF-TOKEN", "t"))
-                    .header("X-XSRF-TOKEN", "t"))
-                .andReturn().getResponse().getStatus();
-        } catch (Exception e) {
-            assertThat(causeChainContains(e, ResourceAccessException.class)).isTrue();
-            return;
-        }
-        assertThat(status).isNotEqualTo(403);
+    void postWithHeaderCsrfPassesCsrfThenRejectsMissingToken() throws Exception {
+        mvc.perform(post("/api/groves")
+                .with(oidcLogin().clientRegistration(TestFenceRegistrations.FENCE))
+                .cookie(new Cookie("XSRF-TOKEN", "t"))
+                .header("X-XSRF-TOKEN", "t"))
+            .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void logoutFormWithRawCookieTokenAccepted() throws Exception {
-        mvc.perform(post("/logout").cookie(new Cookie("XSRF-TOKEN", "t")).param("_csrf", "t"))
-            .andExpect(status().isFound());
+    void logoutWithoutCsrfIs403() throws Exception {
+        mvc.perform(post("/logout"))
+            .andExpect(status().isForbidden());
     }
 
     @Test
@@ -121,14 +113,5 @@ class AuthOnSecurityTest {
         assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION))
             .startsWith("http://fence.test/connect/logout?")
             .contains("post_logout_redirect_uri=");
-    }
-
-    private static boolean causeChainContains(Throwable t, Class<? extends Throwable> type) {
-        for (Throwable c = t; c != null; c = c.getCause()) {
-            if (type.isInstance(c)) {
-                return true;
-            }
-        }
-        return false;
     }
 }

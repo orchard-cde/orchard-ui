@@ -49,6 +49,12 @@ public class StubCoreApplication {
         return cookie;
     }
 
+    @GetMapping("/api/echo-xsrf")
+    String echoXsrf(@RequestHeader(value = "X-XSRF-TOKEN", defaultValue = "none") String token) {
+        HITS.incrementAndGet();
+        return token;
+    }
+
     @GetMapping("/api/sets-cookie")
     String setsCookie(HttpServletResponse response) {
         HITS.incrementAndGet();

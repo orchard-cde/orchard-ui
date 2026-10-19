@@ -95,6 +95,12 @@ class ApiProxyAuthOnIntegrationTest {
     }
 
     @Test
+    void dropsBrowserXsrfHeader() throws Exception {
+        mvc.perform(get("/api/echo-xsrf").with(login()).header("X-XSRF-TOKEN", "csrf-secret"))
+            .andExpect(content().string("none"));
+    }
+
+    @Test
     void dropsUpstreamSetCookie() throws Exception {
         MvcResult result = mvc.perform(get("/api/sets-cookie").with(login()))
             .andExpect(status().isOk())

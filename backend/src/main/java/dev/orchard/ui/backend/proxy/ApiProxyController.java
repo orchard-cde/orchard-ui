@@ -35,7 +35,7 @@ public class ApiProxyController {
         Set.of("content-length", "connection", "keep-alive", "transfer-encoding",
             "proxy-authenticate", "proxy-authorization", "te", "trailer", "upgrade");
 
-    private static final Set<String> SESSION_REQUEST_HEADERS = Set.of("authorization", "cookie");
+    private static final Set<String> SESSION_REQUEST_HEADERS = Set.of("authorization", "cookie", "x-xsrf-token");
 
     private final RestClient coreRestClient;
     private final String coreBaseUrl;
