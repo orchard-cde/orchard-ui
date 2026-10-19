@@ -2,9 +2,13 @@ package dev.orchard.ui.backend.proxy;
 
 import java.time.Duration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,6 +18,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RestController
 @Profile("stub")
 public class StubCoreApplication {
+
+    @Bean
+    SecurityFilterChain permitAll(HttpSecurity http) {
+        return http.authorizeHttpRequests(a -> a.anyRequest().permitAll())
+            .csrf(AbstractHttpConfigurer::disable)
+            .build();
+    }
 
     @GetMapping("/api/secure")
     ResponseEntity<String> secure() {
