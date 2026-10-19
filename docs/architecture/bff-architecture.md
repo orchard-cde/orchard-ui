@@ -125,7 +125,7 @@ dependency-management, and GraalVM native-image plugin versions track orchard co
 The proxy must satisfy two transport shapes the UI actually uses:
 
 - **REST** via axios on `/api/**`, with a `401` response driving a client-side redirect to
-  `/unauthorized`. The proxy passes request headers and response status through transparently when
+  `/signin`. The proxy passes request headers and response status through transparently when
   auth is off. When fence login is on (`orchard.fence.issuer-uri` set), the browser holds only the
   session cookie: the proxy drops the browser's `Authorization` and `Cookie` request headers and
   upstream `Set-Cookie`, and attaches `Authorization: Bearer <access token>` from the session's
@@ -182,11 +182,25 @@ classpath directories report `isReadable()==true` and would otherwise be served 
 
 ## 6. Configuration and dev workflow
 
-**Configuration.** The BFF needs exactly one piece of wiring to find core:
+**Configuration.**
 
-| Property | Purpose | Default / source |
-|----------|---------|------------------|
-| `orchard.core.base-url` | Upstream base URL for `/api/**` proxying | Environment-overridable (e.g. `http://localhost:8080` in dev) |
+| Env var | Property | Default | Meaning |
+|---|---|---|---|
+| `ORCHARD_CORE_BASE_URL` | `orchard.core.base-url` | `http://localhost:8081` | Upstream base URL for `/api/**` proxying |
+| `ORCHARD_FENCE_ISSUER_URI` | `orchard.fence.issuer-uri` | unset | Setting it turns fence login on (OIDC discovery at startup); unset means auth off |
+| `ORCHARD_FENCE_CLIENT_ID` | `orchard.fence.client-id` | `orchard-ui` | Registered fence client |
+| `ORCHARD_FENCE_CLIENT_SECRET` | `orchard.fence.client-secret` | unset | If set, `client_secret_basic`; if unset, `none` + PKCE |
+| `ORCHARD_SESSION_COOKIE_SECURE` | `server.servlet.session.cookie.secure` | `false` | Must be `true` behind HTTPS |
+
+Auth is selected at runtime from `orchard.fence.issuer-uri`, not by `@Conditional`/`@Profile`, so the native binary honours it. Registration id is `fence`; scopes are `openid profile email`; post-logout redirect is `{baseUrl}/`.
+
+**Auth endpoints** (auth on; same origin as the UI):
+
+- `GET /auth/session` returns `{enabled, authenticated}` (always available; `enabled:false` when auth is off).
+- `GET /oauth2/authorization/fence` starts login; the callback is `/login/oauth2/code/fence`.
+- `POST /logout` is CSRF-protected: send the token as form field `_csrf` or header `X-XSRF-TOKEN`.
+- `/signin` is the SPA sign-in route; failed logins land on `/signin?error`.
+- Cookies: `ORCHARD_UI_SESSION` (HttpOnly, SameSite=Lax) holds the session; `XSRF-TOKEN` (readable by JS) carries the CSRF token.
 
 The UI build continues to set `NEXT_PUBLIC_API_URL=''` so the browser emits relative `/api/**`
 URLs; the BFF resolves them to `orchard.core.base-url`. The `??`-not-`||` env handling in
