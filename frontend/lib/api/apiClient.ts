@@ -10,7 +10,7 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
-        window.location.href = '/unauthorized';
+        window.location.href = '/signin';
         return new Promise(() => {});
       }
     }
