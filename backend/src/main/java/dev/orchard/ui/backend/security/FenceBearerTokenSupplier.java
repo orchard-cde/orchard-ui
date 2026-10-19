@@ -15,7 +15,6 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProviderBuilder;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizedClientManager;
-import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
 import org.springframework.stereotype.Component;
@@ -32,10 +31,11 @@ public class FenceBearerTokenSupplier implements BearerTokenSupplier {
     private final OAuth2AuthorizedClientRepository authorizedClients;
 
     @Autowired
-    public FenceBearerTokenSupplier(FenceProperties properties, FenceRegistrations registrations) {
+    public FenceBearerTokenSupplier(FenceProperties properties, FenceRegistrations registrations,
+            OAuth2AuthorizedClientRepository authorizedClients) {
         this.properties = properties;
         if (properties.enabled()) {
-            this.authorizedClients = new HttpSessionOAuth2AuthorizedClientRepository();
+            this.authorizedClients = authorizedClients;
             DefaultOAuth2AuthorizedClientManager defaultManager = new DefaultOAuth2AuthorizedClientManager(
                 new InMemoryClientRegistrationRepository(registrations.fence().orElseThrow()), authorizedClients);
             defaultManager.setAuthorizedClientProvider(OAuth2AuthorizedClientProviderBuilder.builder()
@@ -44,7 +44,7 @@ public class FenceBearerTokenSupplier implements BearerTokenSupplier {
                 .build());
             this.manager = defaultManager;
         } else {
-            this.authorizedClients = null;
+            this.authorizedClients = authorizedClients;
             this.manager = null;
         }
     }

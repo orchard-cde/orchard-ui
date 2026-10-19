@@ -139,7 +139,8 @@ The proxy must satisfy two transport shapes the UI actually uses:
 > (documented alternative).** Because the BFF ships as a GraalVM **native binary** (see
 > [§3](#3-component-placement-and-build)), native-image cleanliness is the deciding criterion. The
 > primary proxy is a catch-all `@RequestMapping("/api/**")` controller using `RestClient` whose
-> upstream response `InputStream` is piped into a `StreamingResponseBody` — it preserves SSE
+> upstream response `InputStream` is copied to the servlet `response.getOutputStream()`, flushing
+> each chunk — it preserves SSE
 > streaming, passes request headers (incl. `Authorization`) and response status through, and is
 > trivially native-image friendly (no reflection-heavy machinery). With auth on, it
 > instead strips `Authorization`/`Cookie` and attaches the session's bearer through
@@ -211,7 +212,9 @@ The BFF is built as a seam, not just a proxy. Future capabilities slot in withou
   tokens server-side in the HTTP session, and attaches the bearer token to proxied `/api/**` calls,
   so the browser never holds a JWT. `BearerTokenSupplier` is the seam between the proxy and
   security: `FenceBearerTokenSupplier` obtains (and refreshes) the access token through
-  `DefaultOAuth2AuthorizedClientManager`, and `discard` drops the authorized client and session on
+  `DefaultOAuth2AuthorizedClientManager` over the single `HttpSessionOAuth2AuthorizedClientRepository`
+  bean that `oauth2Login` also writes to (always defined, wired explicitly into the auth-on chain),
+  and `discard` drops the authorized client and session on
   a missing token or an upstream `401`. The proxy enforces the header boundary: browser
   `Authorization`/`Cookie` never go upstream, core `Set-Cookie` never comes back. With the issuer
   unset, headers pass through unchanged. This is the primary reason Spring Boot was chosen over a
@@ -247,7 +250,7 @@ packaging question, deferred — see [§9](#9-out-of-scope--open-questions).
 | Item | Status | Notes |
 |------|--------|-------|
 | Distribution format | **Decided: GraalVM native binary** (`orchard-ui-backend`) | The `:backend` module builds a standalone native binary, independently deployable and consumed by orchard `dev-server start` (download + spawn as a sibling to `orchard-server`). **Published per architecture (linux/amd64 + linux/arm64) as the release artifact; the static-export tarball is retired.** |
-| Actual auth/session/token-relay implementation | Deferred | The seam is built; the logic is future work (see §7) |
+| Auth/session/token relay | Built | Enabled at runtime by `orchard.fence.issuer-uri` (see §4, §7) |
 | WebSocket proxying | Not needed today | UI uses SSE; revisit if WS is adopted |
 | Spring Cloud Gateway ↔ Spring Boot 4.x compatibility | Must verify | Determines primary vs. fallback proxy (see §4) |
 
