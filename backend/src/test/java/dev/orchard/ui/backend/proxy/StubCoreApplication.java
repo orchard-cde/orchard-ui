@@ -23,6 +23,7 @@ public class StubCoreApplication {
     SecurityFilterChain permitAll(HttpSecurity http) {
         return http.authorizeHttpRequests(a -> a.anyRequest().permitAll())
             .csrf(AbstractHttpConfigurer::disable)
+            .headers(AbstractHttpConfigurer::disable)
             .build();
     }
 
