@@ -9,6 +9,7 @@ export const DRAWER_WIDTH = 240;
 
 interface TopBarProps {
   cultivatorName: string;
+  authenticated: boolean;
 }
 
 export default function TopBar({ cultivatorName }: TopBarProps) {
