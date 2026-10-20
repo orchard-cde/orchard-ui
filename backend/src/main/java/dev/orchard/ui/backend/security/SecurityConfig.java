@@ -20,6 +20,8 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 @Configuration
 class SecurityConfig {
 
+    private static final String API = "/api/**";
+
     @Bean
     OAuth2AuthorizedClientRepository authorizedClientRepository() {
         return new HttpSessionOAuth2AuthorizedClientRepository();
@@ -48,9 +50,9 @@ class SecurityConfig {
         OidcClientInitiatedLogoutSuccessHandler logoutHandler = new OidcClientInitiatedLogoutSuccessHandler(repository);
         logoutHandler.setPostLogoutRedirectUri("{baseUrl}/");
         return http
-            .authorizeHttpRequests(a -> a.requestMatchers("/api/**").authenticated().anyRequest().permitAll())
+            .authorizeHttpRequests(a -> a.requestMatchers(API).authenticated().anyRequest().permitAll())
             .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(
-                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED), PathPatternRequestMatcher.withDefaults().matcher("/api/**")))
+                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED), PathPatternRequestMatcher.withDefaults().matcher(API)))
             .oauth2Login(l -> l.loginPage("/signin").failureUrl("/signin?error")
                 .clientRegistrationRepository(repository).authorizedClientRepository(authorizedClients))
             .csrf(c -> c

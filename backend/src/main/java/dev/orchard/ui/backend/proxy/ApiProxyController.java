@@ -36,6 +36,7 @@ public class ApiProxyController {
             "proxy-authenticate", "proxy-authorization", "te", "trailer", "upgrade");
 
     private static final Set<String> SESSION_REQUEST_HEADERS = Set.of("authorization", "cookie", "x-xsrf-token");
+    private static final Set<String> SESSION_RESPONSE_HEADERS = Set.of("set-cookie");
 
     private final RestClient coreRestClient;
     private final String coreBaseUrl;
@@ -114,7 +115,7 @@ public class ApiProxyController {
     private void copyResponseHeaders(HttpHeaders upstream, HttpServletResponse response, boolean authOn) {
         upstream.forEach((name, values) -> {
             String lower = name.toLowerCase();
-            if (SKIP_RESPONSE_HEADERS.contains(lower) || (authOn && lower.equals("set-cookie"))) {
+            if (SKIP_RESPONSE_HEADERS.contains(lower) || (authOn && SESSION_RESPONSE_HEADERS.contains(lower))) {
                 return;
             }
             for (String value : values) {

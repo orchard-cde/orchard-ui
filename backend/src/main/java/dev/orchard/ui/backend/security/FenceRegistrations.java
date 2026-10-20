@@ -6,5 +6,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 
 public interface FenceRegistrations {
 
+    String ID = "fence";
+
     Optional<ClientRegistration> fence();
 }

@@ -8,7 +8,6 @@ import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.client.ClientAuthorizationException;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
@@ -24,8 +23,6 @@ import dev.orchard.ui.backend.proxy.BearerTokenSupplier;
 @Component
 public class FenceBearerTokenSupplier implements BearerTokenSupplier {
 
-    private static final String REGISTRATION_ID = "fence";
-
     private final FenceProperties properties;
     private final OAuth2AuthorizedClientManager manager;
     private final OAuth2AuthorizedClientRepository authorizedClients;
@@ -33,20 +30,7 @@ public class FenceBearerTokenSupplier implements BearerTokenSupplier {
     @Autowired
     public FenceBearerTokenSupplier(FenceProperties properties, FenceRegistrations registrations,
             OAuth2AuthorizedClientRepository authorizedClients) {
-        this.properties = properties;
-        if (properties.enabled()) {
-            this.authorizedClients = authorizedClients;
-            DefaultOAuth2AuthorizedClientManager defaultManager = new DefaultOAuth2AuthorizedClientManager(
-                new InMemoryClientRegistrationRepository(registrations.fence().orElseThrow()), authorizedClients);
-            defaultManager.setAuthorizedClientProvider(OAuth2AuthorizedClientProviderBuilder.builder()
-                .authorizationCode()
-                .refreshToken()
-                .build());
-            this.manager = defaultManager;
-        } else {
-            this.authorizedClients = authorizedClients;
-            this.manager = null;
-        }
+        this(properties, properties.enabled() ? buildManager(registrations, authorizedClients) : null, authorizedClients);
     }
 
     FenceBearerTokenSupplier(FenceProperties properties, OAuth2AuthorizedClientManager manager,
@@ -54,6 +38,17 @@ public class FenceBearerTokenSupplier implements BearerTokenSupplier {
         this.properties = properties;
         this.manager = manager;
         this.authorizedClients = authorizedClients;
+    }
+
+    private static OAuth2AuthorizedClientManager buildManager(FenceRegistrations registrations,
+            OAuth2AuthorizedClientRepository authorizedClients) {
+        DefaultOAuth2AuthorizedClientManager manager = new DefaultOAuth2AuthorizedClientManager(
+            new InMemoryClientRegistrationRepository(registrations.fence().orElseThrow()), authorizedClients);
+        manager.setAuthorizedClientProvider(OAuth2AuthorizedClientProviderBuilder.builder()
+            .authorizationCode()
+            .refreshToken()
+            .build());
+        return manager;
     }
 
     @Override
@@ -67,7 +62,7 @@ public class FenceBearerTokenSupplier implements BearerTokenSupplier {
         if (authentication == null) {
             return Optional.empty();
         }
-        OAuth2AuthorizeRequest authorizeRequest = OAuth2AuthorizeRequest.withClientRegistrationId(REGISTRATION_ID)
+        OAuth2AuthorizeRequest authorizeRequest = OAuth2AuthorizeRequest.withClientRegistrationId(FenceRegistrations.ID)
             .principal(authentication)
             .attribute(HttpServletRequest.class.getName(), request)
             .attribute(HttpServletResponse.class.getName(), response)
@@ -82,7 +77,7 @@ public class FenceBearerTokenSupplier implements BearerTokenSupplier {
 
     @Override
     public void discard(HttpServletRequest request, HttpServletResponse response) {
-        authorizedClients.removeAuthorizedClient(REGISTRATION_ID,
+        authorizedClients.removeAuthorizedClient(FenceRegistrations.ID,
             SecurityContextHolder.getContext().getAuthentication(), request, response);
         HttpSession session = request.getSession(false);
         if (session != null) {
