@@ -127,7 +127,7 @@ The proxy must satisfy two transport shapes the UI actually uses:
 - **REST** via axios on `/api/**`, with a `401` response driving a client-side redirect to
   `/signin`. The proxy passes request headers and response status through transparently when
   auth is off. When fence login is on (`orchard.fence.issuer-uri` set), the browser holds only the
-  session cookie: the proxy drops the browser's `Authorization` and `Cookie` request headers and
+  session cookie: the proxy drops the browser's `Authorization`, `Cookie` and `X-XSRF-TOKEN` request headers and
   upstream `Set-Cookie`, and attaches `Authorization: Bearer <access token>` from the session's
   authorized client. If no token can be produced, or core answers `401`, the proxy discards the
   authorized client and invalidates the session, so the `401` reaches the UI and ends the session.
@@ -143,7 +143,7 @@ The proxy must satisfy two transport shapes the UI actually uses:
 > each chunk — it preserves SSE
 > streaming, passes request headers (incl. `Authorization`) and response status through, and is
 > trivially native-image friendly (no reflection-heavy machinery). With auth on, it
-> instead strips `Authorization`/`Cookie` and attaches the session's bearer through
+> instead strips `Authorization`/`Cookie`/`X-XSRF-TOKEN` and attaches the session's bearer through
 > `BearerTokenSupplier`, which the controller resolves via `ObjectProvider` (no-op `NONE` when
 > absent), keeping the proxy free of a compile-time dependency on the security package. The servlet variant of Spring
 > Cloud Gateway (`spring-cloud-starter-gateway-server-webmvc`, BOM `2025.1.2`, which supports
@@ -230,7 +230,7 @@ The BFF is built as a seam, not just a proxy. Future capabilities slot in withou
   bean that `oauth2Login` also writes to (always defined, wired explicitly into the auth-on chain),
   and `discard` drops the authorized client and session on
   a missing token or an upstream `401`. The proxy enforces the header boundary: browser
-  `Authorization`/`Cookie` never go upstream, core `Set-Cookie` never comes back. With the issuer
+  `Authorization`/`Cookie`/`X-XSRF-TOKEN` never go upstream, core `Set-Cookie` never comes back. With the issuer
   unset, headers pass through unchanged. This is the primary reason Spring Boot was chosen over a
   static file server.
 - **Response aggregation.** BFF-owned endpoints can aggregate or reshape multiple core calls into

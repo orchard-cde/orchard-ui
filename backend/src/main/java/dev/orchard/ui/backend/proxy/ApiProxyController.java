@@ -22,7 +22,8 @@ import org.springframework.web.client.RestClient;
  * Reverse-proxies every method on /api/** to orchard core, streaming the response so SSE
  * (text/event-stream) is delivered incrementally. Request headers (incl. Authorization) and
  * the response status are passed through; hop-by-hop headers are dropped (spec D4). With auth on,
- * browser Authorization/Cookie and upstream Set-Cookie are dropped and the session's bearer is attached.
+ * browser Authorization, Cookie and X-XSRF-TOKEN and upstream Set-Cookie are dropped and the session's
+ * bearer is attached.
  */
 @RestController
 public class ApiProxyController {
