@@ -40,7 +40,7 @@ export default function MainLayout({
     getCurrentCultivator()
       .then((c) => setCultivatorName(c.displayName || c.username))
       .catch(() => {
-        // Fallback to "Cultivator" — do NOT redirect on layout /api/me failure
+        // Non-401 failures keep the "Cultivator" fallback; apiClient redirects a 401 to /signin
       });
   }, [allowed]);
 
