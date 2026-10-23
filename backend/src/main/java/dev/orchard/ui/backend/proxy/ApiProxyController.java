@@ -9,6 +9,7 @@ import java.util.Set;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -20,7 +21,9 @@ import org.springframework.web.client.RestClient;
 /**
  * Reverse-proxies every method on /api/** to orchard core, streaming the response so SSE
  * (text/event-stream) is delivered incrementally. Request headers (incl. Authorization) and
- * the response status are passed through; hop-by-hop headers are dropped (spec D4).
+ * the response status are passed through; hop-by-hop headers are dropped (spec D4). With auth on,
+ * browser Authorization, Cookie and X-XSRF-TOKEN and upstream Set-Cookie are dropped and the session's
+ * bearer is attached.
  */
 @RestController
 public class ApiProxyController {
@@ -33,17 +36,35 @@ public class ApiProxyController {
         Set.of("content-length", "connection", "keep-alive", "transfer-encoding",
             "proxy-authenticate", "proxy-authorization", "te", "trailer", "upgrade");
 
+    private static final Set<String> SESSION_REQUEST_HEADERS = Set.of("authorization", "cookie", "x-xsrf-token");
+    private static final Set<String> SESSION_RESPONSE_HEADERS = Set.of("set-cookie");
+
     private final RestClient coreRestClient;
     private final String coreBaseUrl;
+    private final BearerTokenSupplier tokens;
 
     public ApiProxyController(RestClient coreRestClient,
-                              @Value("${orchard.core.base-url}") String coreBaseUrl) {
+                              @Value("${orchard.core.base-url}") String coreBaseUrl,
+                              ObjectProvider<BearerTokenSupplier> tokens) {
         this.coreRestClient = coreRestClient;
         this.coreBaseUrl = coreBaseUrl;
+        this.tokens = tokens.getIfAvailable(NoAuthBearerTokenSupplier::new);
     }
 
     @RequestMapping("/api/**")
     public void proxy(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        boolean authOn = tokens.authEnabled();
+        String bearer = null;
+        if (authOn) {
+            bearer = tokens.accessToken(request, response).orElse(null);
+            if (bearer == null) {
+                tokens.discard(request, response);
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+                return;
+            }
+        }
+        String authorization = bearer == null ? null : "Bearer " + bearer;
+
         URI target = ProxyRequests.upstreamUri(coreBaseUrl, request);
 
         byte[] body = StreamUtils.copyToByteArray(request.getInputStream());
@@ -51,14 +72,18 @@ public class ApiProxyController {
         RestClient.RequestBodySpec spec = coreRestClient
             .method(HttpMethod.valueOf(request.getMethod()))
             .uri(target)
-            .headers(h -> copyRequestHeaders(request, h));
+            .headers(h -> copyRequestHeaders(request, h, authOn, authorization));
         if (body.length > 0) {
             spec.body(body);
         }
 
         spec.exchange((clientRequest, clientResponse) -> {
-            response.setStatus(clientResponse.getStatusCode().value());
-            copyResponseHeaders(clientResponse.getHeaders(), response);
+            int status = clientResponse.getStatusCode().value();
+            if (authOn && status == HttpServletResponse.SC_UNAUTHORIZED) {
+                tokens.discard(request, response);
+            }
+            response.setStatus(status);
+            copyResponseHeaders(clientResponse.getHeaders(), response, authOn);
             try (InputStream in = clientResponse.getBody();
                  OutputStream out = response.getOutputStream()) {
                 byte[] buf = new byte[8192];
@@ -72,20 +97,26 @@ public class ApiProxyController {
         });
     }
 
-    private void copyRequestHeaders(HttpServletRequest request, HttpHeaders out) {
+    private void copyRequestHeaders(HttpServletRequest request, HttpHeaders out, boolean authOn,
+                                    String authorization) {
         var names = request.getHeaderNames();
         while (names.hasMoreElements()) {
             String name = names.nextElement();
-            if (SKIP_REQUEST_HEADERS.contains(name.toLowerCase())) {
+            String lower = name.toLowerCase();
+            if (SKIP_REQUEST_HEADERS.contains(lower) || (authOn && SESSION_REQUEST_HEADERS.contains(lower))) {
                 continue;
             }
             out.addAll(name, List.of(java.util.Collections.list(request.getHeaders(name)).toArray(String[]::new)));
         }
+        if (authorization != null) {
+            out.set(HttpHeaders.AUTHORIZATION, authorization);
+        }
     }
 
-    private void copyResponseHeaders(HttpHeaders upstream, HttpServletResponse response) {
+    private void copyResponseHeaders(HttpHeaders upstream, HttpServletResponse response, boolean authOn) {
         upstream.forEach((name, values) -> {
-            if (SKIP_RESPONSE_HEADERS.contains(name.toLowerCase())) {
+            String lower = name.toLowerCase();
+            if (SKIP_RESPONSE_HEADERS.contains(lower) || (authOn && SESSION_RESPONSE_HEADERS.contains(lower))) {
                 return;
             }
             for (String value : values) {

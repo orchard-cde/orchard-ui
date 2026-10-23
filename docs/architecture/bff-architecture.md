@@ -38,14 +38,14 @@ Spring Boot — rather than nginx, Caddy, or a Node server — is the chosen run
 1. **Stack consistency.** orchard core is Spring Boot 4.x on Java 25 (GraalVM CE) with GraalVM
    native-image builds. The BFF reuses that toolchain, idioms, and native-binary packaging rather
    than introducing a second ecosystem.
-2. **Room to grow.** orchard core is an OAuth2 resource server. Today the browser is responsible
-   for credentials. A Spring Boot BFF is the natural place to later terminate a session cookie and
-   relay tokens to core (the canonical "BFF security pattern"), or to aggregate/reshape core
-   responses — without re-platforming. See [§7](#7-growth-path).
+2. **Room to grow.** orchard core is an OAuth2 resource server. A Spring Boot BFF is the natural
+   place to terminate a session cookie and relay tokens to core (the canonical "BFF security
+   pattern"), which it now does when fence login is configured, and later to aggregate/reshape
+   core responses — without re-platforming. See [§7](#7-growth-path).
 
-The BFF's job **today** is deliberately thin: serve static + proxy. The Spring Boot choice is an
-investment in that growth path and stack consistency, made with eyes open that a pure serve+proxy
-needs less.
+The BFF serves the static UI and proxies `/api/**`. With `ORCHARD_FENCE_ISSUER_URI` set it also runs
+the fence sign-in, holds each user's token in a server-side session, and relays it to core (§4, §6);
+without it, it stays a pure serve+proxy.
 
 ---
 
@@ -124,9 +124,13 @@ dependency-management, and GraalVM native-image plugin versions track orchard co
 
 The proxy must satisfy two transport shapes the UI actually uses:
 
-- **REST** via axios on `/api/**` (no credential attached today), with a `401` response driving a
-  client-side redirect to `/unauthorized`. The proxy must pass request headers and response status
-  through transparently.
+- **REST** via axios on `/api/**`, with a `401` response driving a client-side redirect to
+  `/signin`. The proxy passes request headers and response status through transparently when
+  auth is off. When fence login is on (`orchard.fence.issuer-uri` set), the browser holds only the
+  session cookie: the proxy drops the browser's `Authorization`, `Cookie` and `X-XSRF-TOKEN` request headers and
+  upstream `Set-Cookie`, and attaches `Authorization: Bearer <access token>` from the session's
+  authorized client. If no token can be produced, or core answers `401`, the proxy discards the
+  authorized client and invalidates the session, so the `401` reaches the UI and ends the session.
 - **Server-Sent Events** via `EventSource` on `/api/groves/{id}/events`
   (`text/event-stream`, long-lived). The proxy must **stream** the response — a buffer-and-forward
   proxy breaks SSE.
@@ -135,9 +139,13 @@ The proxy must satisfy two transport shapes the UI actually uses:
 > (documented alternative).** Because the BFF ships as a GraalVM **native binary** (see
 > [§3](#3-component-placement-and-build)), native-image cleanliness is the deciding criterion. The
 > primary proxy is a catch-all `@RequestMapping("/api/**")` controller using `RestClient` whose
-> upstream response `InputStream` is piped into a `StreamingResponseBody` — it preserves SSE
+> upstream response `InputStream` is copied to the servlet `response.getOutputStream()`, flushing
+> each chunk — it preserves SSE
 > streaming, passes request headers (incl. `Authorization`) and response status through, and is
-> trivially native-image friendly (no reflection-heavy machinery). The servlet variant of Spring
+> trivially native-image friendly (no reflection-heavy machinery). With auth on, it
+> instead strips `Authorization`/`Cookie`/`X-XSRF-TOKEN` and attaches the session's bearer through
+> `BearerTokenSupplier`, which the controller resolves via `ObjectProvider` (no-op `NoAuthBearerTokenSupplier` when
+> absent), keeping the proxy free of a compile-time dependency on the security package. The servlet variant of Spring
 > Cloud Gateway (`spring-cloud-starter-gateway-server-webmvc`, BOM `2025.1.2`, which supports
 > Spring Boot 4.1.0) is a viable alternative — it gives SSE streaming and header/status passthrough
 > by default — but it is reflection-heavy and needs native reachability metadata, so it is held in
@@ -174,11 +182,25 @@ classpath directories report `isReadable()==true` and would otherwise be served 
 
 ## 6. Configuration and dev workflow
 
-**Configuration.** The BFF needs exactly one piece of wiring to find core:
+**Configuration.**
 
-| Property | Purpose | Default / source |
-|----------|---------|------------------|
-| `orchard.core.base-url` | Upstream base URL for `/api/**` proxying | Environment-overridable (e.g. `http://localhost:8080` in dev) |
+| Env var | Property | Default | Meaning |
+|---|---|---|---|
+| `ORCHARD_CORE_BASE_URL` | `orchard.core.base-url` | `http://localhost:8081` | Upstream base URL for `/api/**` proxying |
+| `ORCHARD_FENCE_ISSUER_URI` | `orchard.fence.issuer-uri` | unset | Setting it turns fence login on (OIDC discovery at startup); unset means auth off |
+| `ORCHARD_FENCE_CLIENT_ID` | `orchard.fence.client-id` | `orchard-ui` | Registered fence client |
+| `ORCHARD_FENCE_CLIENT_SECRET` | `orchard.fence.client-secret` | unset | If set, `client_secret_basic`; if unset, `none` + PKCE |
+| `ORCHARD_SESSION_COOKIE_SECURE` | `server.servlet.session.cookie.secure` | `false` | Must be `true` behind HTTPS |
+
+Auth is selected at runtime from `orchard.fence.issuer-uri`, not by `@Conditional`/`@Profile`, so the native binary honours it. Registration id is `fence`; scopes are `openid profile email`; post-logout redirect is `{baseUrl}/`.
+
+**Auth endpoints** (auth on; same origin as the UI):
+
+- `GET /auth/session` returns `{enabled, authenticated}` (always available; `enabled:false` when auth is off).
+- `GET /oauth2/authorization/fence` starts login; the callback is `/login/oauth2/code/fence`.
+- `POST /logout` is CSRF-protected: send the token as form field `_csrf` or header `X-XSRF-TOKEN`.
+- `/signin` is the SPA sign-in route; failed logins land on `/signin?error`.
+- Cookies: `ORCHARD_UI_SESSION` (HttpOnly, SameSite=Lax) holds the session; `XSRF-TOKEN` (readable by JS) carries the CSRF token.
 
 The UI build continues to set `NEXT_PUBLIC_API_URL=''` so the browser emits relative `/api/**`
 URLs; the BFF resolves them to `orchard.core.base-url`. The `??`-not-`||` env handling in
@@ -199,16 +221,24 @@ In packaged mode there is no Node runtime — the UI is baked into the BFF artif
 
 The BFF is built as a seam, not just a proxy. Future capabilities slot in without re-platforming:
 
-- **Session/auth relay (BFF security pattern).** Because core is an OAuth2 resource server, the BFF
-  can later terminate a browser session cookie, hold tokens server-side, and attach the bearer
-  token to proxied `/api/**` calls — so the browser stops holding JWTs. This is the primary reason
-  Spring Boot was chosen over a static file server.
+- **Session/auth relay (BFF security pattern) — built.** Core is an OAuth2 resource server; with
+  `orchard.fence.issuer-uri` set the BFF terminates the browser session cookie, holds the fence
+  tokens server-side in the HTTP session, and attaches the bearer token to proxied `/api/**` calls,
+  so the browser never holds a JWT. `BearerTokenSupplier` is the seam between the proxy and
+  security: `FenceBearerTokenSupplier` obtains (and refreshes) the access token through
+  `DefaultOAuth2AuthorizedClientManager` over the single `HttpSessionOAuth2AuthorizedClientRepository`
+  bean that `oauth2Login` also writes to (always defined, wired explicitly into the auth-on chain),
+  and `discard` drops the authorized client and session on
+  a missing token or an upstream `401`. The proxy enforces the header boundary: browser
+  `Authorization`/`Cookie`/`X-XSRF-TOKEN` never go upstream, core `Set-Cookie` never comes back. With the issuer
+  unset, headers pass through unchanged. This is the primary reason Spring Boot was chosen over a
+  static file server.
 - **Response aggregation.** BFF-owned endpoints can aggregate or reshape multiple core calls into
   UI-shaped payloads, hiding internal service structure.
 - **WebSocket passthrough.** If the UI adopts WebSocket (beyond today's SSE), the proxy layer gains
   WS support — straightforward with Spring Cloud Gateway.
 
-These are explicitly **not** built in the initial cut; they are the justification for the runtime
+The remaining items are explicitly **not** built; they are the justification for the runtime
 choice, realized later.
 
 ---
@@ -234,7 +264,7 @@ packaging question, deferred — see [§9](#9-out-of-scope--open-questions).
 | Item | Status | Notes |
 |------|--------|-------|
 | Distribution format | **Decided: GraalVM native binary** (`orchard-ui-backend`) | The `:backend` module builds a standalone native binary, independently deployable and consumed by orchard `dev-server start` (download + spawn as a sibling to `orchard-server`). **Published per architecture (linux/amd64 + linux/arm64) as the release artifact; the static-export tarball is retired.** |
-| Actual auth/session/token-relay implementation | Deferred | The seam is built; the logic is future work (see §7) |
+| Auth/session/token relay | Built | Enabled at runtime by `orchard.fence.issuer-uri` (see §4, §7) |
 | WebSocket proxying | Not needed today | UI uses SSE; revisit if WS is adopted |
 | Spring Cloud Gateway ↔ Spring Boot 4.x compatibility | Must verify | Determines primary vs. fallback proxy (see §4) |
 

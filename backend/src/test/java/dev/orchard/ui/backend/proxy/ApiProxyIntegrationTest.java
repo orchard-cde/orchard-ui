@@ -29,10 +29,13 @@ class ApiProxyIntegrationTest {
     static ConfigurableApplicationContext stubCore;
     static int stubPort;
 
-    @LocalServerPort
-    int backendPort;
+    private final int backendPort;
 
     private final HttpClient client = HttpClient.newHttpClient();
+
+    ApiProxyIntegrationTest(@LocalServerPort int backendPort) {
+        this.backendPort = backendPort;
+    }
 
     @BeforeAll
     static void startStubCore() {
@@ -73,6 +76,30 @@ class ApiProxyIntegrationTest {
             HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode()).isEqualTo(200);
         assertThat(resp.body()).isEqualTo("Bearer test-token");
+    }
+
+    @Test
+    void authOffAddsNoSecurityResponseHeaders() throws Exception {
+        var resp = client.send(
+            HttpRequest.newBuilder(URI.create("http://localhost:" + backendPort + "/api/secure")).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+        assertThat(resp.headers().firstValue("X-Frame-Options")).isEmpty();
+        assertThat(resp.headers().firstValue("X-Content-Type-Options")).isEmpty();
+        assertThat(resp.headers().firstValue("Cache-Control")).isEmpty();
+        assertThat(resp.headers().firstValue("Pragma")).isEmpty();
+        assertThat(resp.headers().firstValue("Expires")).isEmpty();
+    }
+
+    @Test
+    void percentEncodedPathSegmentStillProxies() throws Exception {
+        var resp = client.send(
+            HttpRequest.newBuilder(URI.create("http://localhost:" + backendPort + "/api/groves/a%20b/events"))
+                .header("Accept", MediaType.TEXT_EVENT_STREAM_VALUE).GET().build(),
+            HttpResponse.BodyHandlers.ofLines());
+        try (Stream<String> lines = resp.body()) {
+            assertThat(resp.statusCode()).isEqualTo(200);
+            assertThat(lines.anyMatch(l -> l.startsWith("data:"))).isTrue();
+        }
     }
 
     @Test

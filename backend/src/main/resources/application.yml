@@ -1,5 +1,12 @@
 server:
   port: 8080
+  servlet:
+    session:
+      cookie:
+        name: ORCHARD_UI_SESSION
+        http-only: true
+        same-site: lax
+        secure: ${ORCHARD_SESSION_COOKIE_SECURE:false}
 
 spring:
   application:
@@ -10,6 +17,11 @@ orchard:
     # Upstream orchard core. The BFF is the browser origin (8080); core is fronted behind it.
     # Default avoids a self-proxy loop when both run locally. dev-server owns final ports (F4).
     base-url: ${ORCHARD_CORE_BASE_URL:http://localhost:8081}
+
+  fence:
+    issuer-uri: ${ORCHARD_FENCE_ISSUER_URI:}
+    client-id: ${ORCHARD_FENCE_CLIENT_ID:orchard-ui}
+    client-secret: ${ORCHARD_FENCE_CLIENT_SECRET:}
 
 management:
   endpoints:

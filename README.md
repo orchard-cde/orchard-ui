@@ -31,7 +31,7 @@ Override the API origin by copying `frontend/.env.local.example` to `frontend/.e
 ./gradlew :backend:bootRun        # serves on :8080, proxies /api/** to orchard.core.base-url
 ```
 
-Point it at core with `ORCHARD_CORE_BASE_URL` (default `http://localhost:8081`). For hot-reload, run the backend with the `dev` profile and a running `next dev`:
+Point it at core with `ORCHARD_CORE_BASE_URL` (default `http://localhost:8081`). To require fence login, set `ORCHARD_FENCE_ISSUER_URI` (plus `ORCHARD_FENCE_CLIENT_ID` / `ORCHARD_FENCE_CLIENT_SECRET` as needed, and `ORCHARD_SESSION_COOKIE_SECURE=true` behind HTTPS); unset means auth off. See `docs/architecture/bff-architecture.md` §6. For hot-reload, run the backend with the `dev` profile and a running `next dev`:
 
 ```bash
 ./gradlew :backend:bootRun --args='--spring.profiles.active=dev'   # proxies non-/api to next dev (:3000)

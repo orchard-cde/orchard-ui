@@ -1,4 +1,4 @@
-export default function UnauthorizedLayout({
+export default function SignInLayout({
   children,
 }: {
   children: React.ReactNode;
