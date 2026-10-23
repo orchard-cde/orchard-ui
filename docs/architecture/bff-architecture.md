@@ -38,14 +38,14 @@ Spring Boot — rather than nginx, Caddy, or a Node server — is the chosen run
 1. **Stack consistency.** orchard core is Spring Boot 4.x on Java 25 (GraalVM CE) with GraalVM
    native-image builds. The BFF reuses that toolchain, idioms, and native-binary packaging rather
    than introducing a second ecosystem.
-2. **Room to grow.** orchard core is an OAuth2 resource server. Today the browser is responsible
-   for credentials. A Spring Boot BFF is the natural place to later terminate a session cookie and
-   relay tokens to core (the canonical "BFF security pattern"), or to aggregate/reshape core
-   responses — without re-platforming. See [§7](#7-growth-path).
+2. **Room to grow.** orchard core is an OAuth2 resource server. A Spring Boot BFF is the natural
+   place to terminate a session cookie and relay tokens to core (the canonical "BFF security
+   pattern"), which it now does when fence login is configured, and later to aggregate/reshape
+   core responses — without re-platforming. See [§7](#7-growth-path).
 
-The BFF's job **today** is deliberately thin: serve static + proxy. The Spring Boot choice is an
-investment in that growth path and stack consistency, made with eyes open that a pure serve+proxy
-needs less.
+The BFF serves the static UI and proxies `/api/**`. With `ORCHARD_FENCE_ISSUER_URI` set it also runs
+the fence sign-in, holds each user's token in a server-side session, and relays it to core (§4, §6);
+without it, it stays a pure serve+proxy.
 
 ---
 
