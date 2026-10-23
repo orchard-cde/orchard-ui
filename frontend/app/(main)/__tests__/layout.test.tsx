@@ -74,6 +74,17 @@ describe('MainLayout session gate', () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it('keeps the Cultivator fallback without redirecting when /api/me fails with a non-401', async () => {
+    (getSession as jest.Mock).mockResolvedValue({ enabled: true, authenticated: true });
+    (getCurrentCultivator as jest.Mock).mockRejectedValue({ message: 'Internal Server Error' });
+    renderLayout();
+
+    expect(await screen.findByText('child content')).toBeInTheDocument();
+    await waitFor(() => expect(getCurrentCultivator).toHaveBeenCalled());
+    expect(await screen.findByText('Cultivator|true')).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it('shows an error alert when the session request fails', async () => {
     (getSession as jest.Mock).mockRejectedValue(new Error('down'));
     renderLayout();
