@@ -144,7 +144,7 @@ The proxy must satisfy two transport shapes the UI actually uses:
 > streaming, passes request headers (incl. `Authorization`) and response status through, and is
 > trivially native-image friendly (no reflection-heavy machinery). With auth on, it
 > instead strips `Authorization`/`Cookie`/`X-XSRF-TOKEN` and attaches the session's bearer through
-> `BearerTokenSupplier`, which the controller resolves via `ObjectProvider` (no-op `NONE` when
+> `BearerTokenSupplier`, which the controller resolves via `ObjectProvider` (no-op `NoAuthBearerTokenSupplier` when
 > absent), keeping the proxy free of a compile-time dependency on the security package. The servlet variant of Spring
 > Cloud Gateway (`spring-cloud-starter-gateway-server-webmvc`, BOM `2025.1.2`, which supports
 > Spring Boot 4.1.0) is a viable alternative — it gives SSE streaming and header/status passthrough

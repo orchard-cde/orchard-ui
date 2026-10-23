@@ -90,14 +90,11 @@ class ApiProxyRealSupplierIntegrationTest {
         MockHttpSession session = new MockHttpSession();
         OAuth2AccessToken token = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "real-t",
             Instant.now().minusSeconds(5), Instant.now().plusSeconds(300));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSession(session);
         authorizedClients.saveAuthorizedClient(
             new OAuth2AuthorizedClient(TestFenceRegistrations.FENCE, "user", token), principal,
-            new MockHttpServletRequest() {
-                @Override
-                public jakarta.servlet.http.HttpSession getSession(boolean create) {
-                    return session;
-                }
-            }, new MockHttpServletResponse());
+            request, new MockHttpServletResponse());
 
         mvc.perform(get("/api/echo-header").session(session).with(authentication(principal)))
             .andExpect(status().isOk())

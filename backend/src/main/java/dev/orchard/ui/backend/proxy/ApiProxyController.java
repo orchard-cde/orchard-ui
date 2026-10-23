@@ -48,7 +48,7 @@ public class ApiProxyController {
                               ObjectProvider<BearerTokenSupplier> tokens) {
         this.coreRestClient = coreRestClient;
         this.coreBaseUrl = coreBaseUrl;
-        this.tokens = tokens.getIfAvailable(() -> BearerTokenSupplier.NONE);
+        this.tokens = tokens.getIfAvailable(NoAuthBearerTokenSupplier::new);
     }
 
     @RequestMapping("/api/**")
