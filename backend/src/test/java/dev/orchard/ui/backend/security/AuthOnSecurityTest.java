@@ -1,7 +1,6 @@
 package dev.orchard.ui.backend.security;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
@@ -29,8 +28,11 @@ class AuthOnSecurityTest {
     @TestBean(methodName = "dev.orchard.ui.backend.security.TestFenceRegistrations#fenceRegistrations")
     FenceRegistrations fenceRegistrations;
 
-    @Autowired
-    MockMvc mvc;
+    private final MockMvc mvc;
+
+    AuthOnSecurityTest(MockMvc mvc) {
+        this.mvc = mvc;
+    }
 
     @Test
     void apiWithoutSessionIs401() throws Exception {

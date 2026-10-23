@@ -5,50 +5,27 @@ import java.util.Optional;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProviderBuilder;
-import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
-import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
-import org.springframework.stereotype.Component;
 
 import dev.orchard.ui.backend.proxy.BearerTokenSupplier;
 
-@Component
-public class FenceBearerTokenSupplier implements BearerTokenSupplier {
+class FenceBearerTokenSupplier implements BearerTokenSupplier {
 
     private final FenceProperties properties;
     private final OAuth2AuthorizedClientManager manager;
     private final OAuth2AuthorizedClientRepository authorizedClients;
-
-    @Autowired
-    public FenceBearerTokenSupplier(FenceProperties properties, FenceRegistrations registrations,
-            OAuth2AuthorizedClientRepository authorizedClients) {
-        this(properties, properties.enabled() ? buildManager(registrations, authorizedClients) : null, authorizedClients);
-    }
 
     FenceBearerTokenSupplier(FenceProperties properties, OAuth2AuthorizedClientManager manager,
             OAuth2AuthorizedClientRepository authorizedClients) {
         this.properties = properties;
         this.manager = manager;
         this.authorizedClients = authorizedClients;
-    }
-
-    private static OAuth2AuthorizedClientManager buildManager(FenceRegistrations registrations,
-            OAuth2AuthorizedClientRepository authorizedClients) {
-        DefaultOAuth2AuthorizedClientManager manager = new DefaultOAuth2AuthorizedClientManager(
-            new InMemoryClientRegistrationRepository(registrations.fence().orElseThrow()), authorizedClients);
-        manager.setAuthorizedClientProvider(OAuth2AuthorizedClientProviderBuilder.builder()
-            .authorizationCode()
-            .refreshToken()
-            .build());
-        return manager;
     }
 
     @Override

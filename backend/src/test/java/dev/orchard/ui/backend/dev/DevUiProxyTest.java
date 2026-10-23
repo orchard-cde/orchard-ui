@@ -33,10 +33,13 @@ class DevUiProxyTest {
     static ConfigurableApplicationContext stubNext;
     static int nextPort;
 
-    @LocalServerPort
-    int backendPort;
+    private final int backendPort;
 
     private final HttpClient client = HttpClient.newHttpClient();
+
+    DevUiProxyTest(@LocalServerPort int backendPort) {
+        this.backendPort = backendPort;
+    }
 
     @BeforeAll
     static void startStubNext() {

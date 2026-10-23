@@ -29,10 +29,13 @@ class ApiProxyIntegrationTest {
     static ConfigurableApplicationContext stubCore;
     static int stubPort;
 
-    @LocalServerPort
-    int backendPort;
+    private final int backendPort;
 
     private final HttpClient client = HttpClient.newHttpClient();
+
+    ApiProxyIntegrationTest(@LocalServerPort int backendPort) {
+        this.backendPort = backendPort;
+    }
 
     @BeforeAll
     static void startStubCore() {

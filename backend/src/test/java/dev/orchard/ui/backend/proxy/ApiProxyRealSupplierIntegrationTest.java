@@ -7,7 +7,6 @@ import jakarta.servlet.Filter;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -48,14 +47,15 @@ class ApiProxyRealSupplierIntegrationTest {
     @TestBean(methodName = "dev.orchard.ui.backend.security.TestFenceRegistrations#fenceRegistrations")
     FenceRegistrations fenceRegistrations;
 
-    @Autowired
-    MockMvc mvc;
+    private final MockMvc mvc;
+    private final OAuth2AuthorizedClientRepository authorizedClients;
+    private final FilterChainProxy filterChainProxy;
 
-    @Autowired
-    OAuth2AuthorizedClientRepository authorizedClients;
-
-    @Autowired
-    FilterChainProxy filterChainProxy;
+    ApiProxyRealSupplierIntegrationTest(MockMvc mvc, OAuth2AuthorizedClientRepository authorizedClients, FilterChainProxy filterChainProxy) {
+        this.mvc = mvc;
+        this.authorizedClients = authorizedClients;
+        this.filterChainProxy = filterChainProxy;
+    }
 
     @BeforeAll
     static void startStubCore() {

@@ -4,7 +4,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -39,8 +38,11 @@ class ApiProxyAuthOnIntegrationTest {
     @TestBean(methodName = "dev.orchard.ui.backend.proxy.ScriptedBearerTokenSupplier#bearerTokenSupplier")
     BearerTokenSupplier bearerTokenSupplier;
 
-    @Autowired
-    MockMvc mvc;
+    private final MockMvc mvc;
+
+    ApiProxyAuthOnIntegrationTest(MockMvc mvc) {
+        this.mvc = mvc;
+    }
 
     @BeforeAll
     static void startStubCore() {

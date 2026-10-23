@@ -14,8 +14,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class SessionControllerAuthOffTest {
 
-    @LocalServerPort
-    int port;
+    private final int port;
+
+    SessionControllerAuthOffTest(@LocalServerPort int port) {
+        this.port = port;
+    }
 
     @Test
     void reportsDisabledAndSetsNoCookies() throws Exception {

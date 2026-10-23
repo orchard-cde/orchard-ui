@@ -20,8 +20,11 @@ class SessionCookieNameTest {
     @TestBean(methodName = "dev.orchard.ui.backend.security.TestFenceRegistrations#fenceRegistrations")
     FenceRegistrations fenceRegistrations;
 
-    @LocalServerPort
-    int port;
+    private final int port;
+
+    SessionCookieNameTest(@LocalServerPort int port) {
+        this.port = port;
+    }
 
     @Test
     void sessionCookieIsNotJsessionid() throws Exception {

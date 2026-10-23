@@ -6,9 +6,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProviderBuilder;
 import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.web.SecurityFilterChain;
@@ -25,6 +28,25 @@ class SecurityConfig {
     @Bean
     OAuth2AuthorizedClientRepository authorizedClientRepository() {
         return new HttpSessionOAuth2AuthorizedClientRepository();
+    }
+
+    @Bean
+    FenceBearerTokenSupplier fenceBearerTokenSupplier(FenceProperties properties, FenceRegistrations registrations,
+            OAuth2AuthorizedClientRepository authorizedClients) {
+        OAuth2AuthorizedClientManager manager =
+            properties.enabled() ? authorizedClientManager(registrations, authorizedClients) : null;
+        return new FenceBearerTokenSupplier(properties, manager, authorizedClients);
+    }
+
+    private static OAuth2AuthorizedClientManager authorizedClientManager(FenceRegistrations registrations,
+            OAuth2AuthorizedClientRepository authorizedClients) {
+        DefaultOAuth2AuthorizedClientManager manager = new DefaultOAuth2AuthorizedClientManager(
+            new InMemoryClientRegistrationRepository(registrations.fence().orElseThrow()), authorizedClients);
+        manager.setAuthorizedClientProvider(OAuth2AuthorizedClientProviderBuilder.builder()
+            .authorizationCode()
+            .refreshToken()
+            .build());
+        return manager;
     }
 
     // Branches at runtime, not via @Conditional*: native AOT would freeze the mode at build time.

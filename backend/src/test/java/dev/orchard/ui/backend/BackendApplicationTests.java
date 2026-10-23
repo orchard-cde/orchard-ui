@@ -9,8 +9,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 class BackendApplicationTests {
 
-    @Value("${orchard.core.base-url}")
-    String coreBaseUrl;
+    private final String coreBaseUrl;
+
+    BackendApplicationTests(@Value("${orchard.core.base-url}") String coreBaseUrl) {
+        this.coreBaseUrl = coreBaseUrl;
+    }
 
     @Test
     void contextLoads() {
