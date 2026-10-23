@@ -20,7 +20,7 @@ class DefaultFenceRegistrations implements FenceRegistrations {
 
     static ClientRegistration.Builder configure(ClientRegistration.Builder builder, FenceProperties properties) {
         return builder
-            .registrationId(ID)
+            .registrationId(FenceRegistrations.ID)
             .clientId(properties.clientId())
             .clientSecret(properties.clientSecret())
             .clientAuthenticationMethod(properties.confidential()
