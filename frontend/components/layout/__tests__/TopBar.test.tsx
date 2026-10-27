@@ -6,6 +6,11 @@ describe('TopBar', () => {
     document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   });
 
+  it('offers the theme switch', () => {
+    render(<TopBar cultivatorName="Ada" authenticated={false} />);
+    expect(screen.getByRole('button', { name: /^Theme/ })).toBeTruthy();
+  });
+
   it('shows no sign out when unauthenticated', () => {
     render(<TopBar cultivatorName="Ada" authenticated={false} />);
     expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();

@@ -7,6 +7,7 @@ import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { TreePine } from 'lucide-react';
 import { readCookie } from '@/lib/csrf';
+import ThemeSwitch from './ThemeSwitch';
 
 export const DRAWER_WIDTH = 240;
 
@@ -33,6 +34,7 @@ export default function TopBar({ cultivatorName, authenticated }: TopBarProps) {
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           Canopy
         </Typography>
+        <ThemeSwitch />
         <Typography variant="body2">{cultivatorName}</Typography>
         {authenticated && (
           <form method="post" action="/logout" onSubmit={handleSubmit}>
