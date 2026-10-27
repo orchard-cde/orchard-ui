@@ -7,7 +7,6 @@ describe('ThemeSwitch', () => {
   let media: MatchMediaStub;
 
   beforeEach(() => {
-    resetTheme();
     media = stubMatchMedia(false);
   });
 
@@ -52,8 +51,7 @@ describe('ThemeSwitch', () => {
   });
 
   it('clears the stored mode and follows the OS when system is chosen', async () => {
-    media.restore();
-    media = stubMatchMedia(true);
+    media.setDark(true);
     localStorage.setItem('orchard-theme', 'light');
     render(<ThemeSwitch />);
     const user = await openMenu(/^Theme: Light$/);
@@ -65,8 +63,7 @@ describe('ThemeSwitch', () => {
   });
 
   it('marks system after switching from dark on a dark OS', async () => {
-    media.restore();
-    media = stubMatchMedia(true);
+    media.setDark(true);
     localStorage.setItem('orchard-theme', 'dark');
     render(<ThemeSwitch />);
     const user = await openMenu(/^Theme: Dark$/);

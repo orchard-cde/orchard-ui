@@ -14,13 +14,12 @@ export function stubMatchMedia(dark: boolean): MatchMediaStub {
     get matches() {
       return matches;
     },
-    media: '(prefers-color-scheme: dark)',
     addEventListener: (_type: string, listener: ChangeListener) =>
       listeners.add(listener),
     removeEventListener: (_type: string, listener: ChangeListener) =>
       listeners.delete(listener),
   };
-  window.matchMedia = jest.fn(() => query) as unknown as typeof window.matchMedia;
+  window.matchMedia = (() => query) as unknown as typeof window.matchMedia;
 
   return {
     setDark(next) {

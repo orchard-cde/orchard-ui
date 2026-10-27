@@ -6,7 +6,6 @@ describe('ThemeRegistry', () => {
   let media: MatchMediaStub;
 
   beforeEach(() => {
-    resetTheme();
     media = stubMatchMedia(false);
     document.documentElement.dataset.theme = 'light';
   });
