@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
+import { initScript } from '@orchard-cde/design/theme';
+import '@orchard-cde/design/dist/tokens.css';
 import ThemeRegistry from '@/components/ThemeRegistry';
 
 // GeistSans/GeistMono define the --font-geist-sans / --font-geist-mono CSS
@@ -19,7 +21,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    <html
+      lang="en"
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: initScript }} />
+      </head>
       <body>
         <ThemeRegistry>{children}</ThemeRegistry>
       </body>
