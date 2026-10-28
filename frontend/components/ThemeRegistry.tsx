@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { AppRouterCacheProvider } from '@mui/material-nextjs/v16-appRouter';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { subscribe } from '@orchard-cde/design/theme';
@@ -21,9 +22,11 @@ export default function ThemeRegistry({
   useEffect(() => subscribe(() => {}), []);
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      {children}
-    </ThemeProvider>
+    <AppRouterCacheProvider>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        {children}
+      </ThemeProvider>
+    </AppRouterCacheProvider>
   );
 }
