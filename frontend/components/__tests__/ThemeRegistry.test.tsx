@@ -15,6 +15,19 @@ describe('ThemeRegistry', () => {
     resetTheme();
   });
 
+  it('derives outlined input borders from the foreground token', () => {
+    render(<ThemeRegistry>content</ThemeRegistry>);
+
+    const css = [...document.styleSheets]
+      .flatMap((sheet) => [...sheet.cssRules].map((rule) => rule.cssText))
+      .join('')
+      .replace(/\s/g, '');
+
+    expect(css).toContain(
+      '--mui-palette-common-onBackgroundChannel:var(--color-foreground-rgb)',
+    );
+  });
+
   it('follows an OS theme change while the preference is system', () => {
     render(<ThemeRegistry>content</ThemeRegistry>);
 
