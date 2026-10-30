@@ -17,7 +17,7 @@
     "@mui/material-nextjs": "^7.3.10",
     "@orchard-cde/design": "https://github.com/orchard-cde/design/archive/refs/tags/v0.2.0.tar.gz",
     "axios": "^1.20.0",
-    "geist": "^1.8.1",
+    "geist": "^1.8.2",
     "lucide-react": "^1.60.0",
     "next": "^16.4.2",
     "react": "19.3.1",
