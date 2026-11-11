@@ -18,7 +18,7 @@
     "@orchard-cde/design": "https://github.com/orchard-cde/design/archive/refs/tags/v0.2.0.tar.gz",
     "axios": "^1.21.0",
     "geist": "^1.9.2",
-    "lucide-react": "^1.65.0",
+    "lucide-react": "^1.70.0",
     "next": "^16.4.3",
     "react": "19.3.1",
     "react-dom": "19.3.1"
