@@ -7,7 +7,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Toolbar from '@mui/material/Toolbar';
-import { TreePine, Sprout } from 'lucide-react';
+import { TreePine, Sprout, Hexagon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { DRAWER_WIDTH } from './TopBar';
@@ -15,6 +15,7 @@ import { DRAWER_WIDTH } from './TopBar';
 const NAV_ITEMS = [
   { label: 'Groves', href: '/groves', icon: <TreePine /> },
   { label: 'Nursery', href: '/nursery', icon: <Sprout /> },
+  { label: 'Apiary', href: '/apiary', icon: <Hexagon /> },
 ];
 
 export default function NavSidebar() {
