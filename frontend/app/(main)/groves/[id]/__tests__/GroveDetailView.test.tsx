@@ -129,7 +129,7 @@ test('a ROOTED VM plot drives the ssh-config fetch, size chips and host line', a
   expect(screen.getByText('10.0.0.1:22')).toBeInTheDocument();
 });
 
-test('a VM plot with a host that is not yet ROOTED does not fetch ssh-config', async () => {
+test('a GROWING grove does not fetch ssh-config even when its VM has a host', async () => {
   (getGrove as jest.Mock).mockResolvedValue({
     ...mockGrove,
     state: 'GROWING',
@@ -144,6 +144,38 @@ test('a VM plot with a host that is not yet ROOTED does not fetch ssh-config', a
 
   expect(getSshConfig).not.toHaveBeenCalled();
   expect(screen.getByText(/waiting for the plot to provision/)).toBeInTheDocument();
+});
+
+test('refetches the grove when SSE reports FLOURISHING so the plot snapshot catches up', async () => {
+  const growing = {
+    ...mockGrove,
+    state: 'GROWING',
+    plot: { ...mockGrove.plot, state: 'SPROUTING', host: null },
+  };
+  (getGrove as jest.Mock).mockResolvedValueOnce(growing);
+
+  const mockEvents = useGroveEvents as jest.Mock;
+  mockEvents.mockReturnValue({ event: null, error: null, connecting: false });
+
+  const { rerender } = render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('Test Grove')).toBeInTheDocument();
+  });
+  expect(screen.queryByText('10.0.0.1:22')).not.toBeInTheDocument();
+
+  mockEvents.mockReturnValue({
+    event: { newState: 'FLOURISHING', previousState: 'GROWING', changedAt: new Date().toISOString() },
+    error: null,
+    connecting: false,
+  });
+  rerender(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('10.0.0.1:22')).toBeInTheDocument();
+  });
+  expect(getGrove).toHaveBeenCalledTimes(2);
+  expect(getSshConfig).toHaveBeenCalledWith('test-id');
 });
 
 test('a CONTAINER plot never fetches ssh-config and shows no disk chip', async () => {
