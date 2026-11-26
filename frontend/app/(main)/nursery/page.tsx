@@ -21,7 +21,7 @@ export default function NurseryPage() {
             Coming Soon
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            The Nursery manages VM providers — where seedlings are grown. This
+            The Nursery manages grove providers — where plots are grown. This
             section will be available once the nursery API is implemented.
           </Typography>
         </CardContent>
