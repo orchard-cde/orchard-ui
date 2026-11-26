@@ -136,8 +136,12 @@ export default function GroveDetailView() {
     if (sseEvent) {
       setCurrentState(sseEvent.newState);
       setActionLoading(false);
+      if (sseEvent.newState === 'FLOURISHING') {
+        // The plot gains its host while provisioning; refresh the load-time snapshot.
+        getGrove(groveId).then(setGrove).catch(() => {});
+      }
     }
-  }, [sseEvent]);
+  }, [sseEvent, groveId]);
 
   useEffect(() => {
     if (isFlourishing) {
