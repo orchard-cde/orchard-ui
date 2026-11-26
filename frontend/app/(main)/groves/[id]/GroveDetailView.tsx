@@ -153,9 +153,9 @@ export default function GroveDetailView() {
     return () => clearTimeout(timer);
   }, [actionLoading]);
 
-  // Mirrors Grove.sshReachableVm() in core: ssh-config answers 503 until the VM is ROOTED.
-  const sshReachable =
-    grove?.plot?.kind === 'VM' && !!grove.plot.host && grove.plot.state === 'ROOTED';
+  // FLOURISHING (live via SSE) implies a ROOTED plot, which is what ssh-config needs;
+  // grove.plot is a load-time snapshot and may predate the plot being rooted.
+  const sshReachable = isFlourishing && grove?.plot?.kind === 'VM';
 
   useEffect(() => {
     if (sshReachable && !sshFetched) {
@@ -182,18 +182,14 @@ export default function GroveDetailView() {
   if (!grove) return null;
 
   const plot = grove.plot;
-  const resourceChips = plot
-    ? [
-        plot.cpuCores !== null ? `${plot.cpuCores} CPU` : null,
-        plot.memoryMb !== null ? `${Math.round(plot.memoryMb / 1024)} GB RAM` : null,
-        plot.diskGb !== null ? `${plot.diskGb} GB disk` : null,
-      ].filter((label): label is string => label !== null)
-    : [];
-  const substrate = !plot
-    ? null
-    : plot.kind === 'VM'
-      ? plot.host && `${plot.host}:${plot.sshPort}`
-      : plot.runtime?.toLowerCase();
+  const resourceChips = [
+    plot?.cpuCores != null ? `${plot.cpuCores} CPU` : null,
+    plot?.memoryMb != null ? `${Math.round(plot.memoryMb / 1024)} GB RAM` : null,
+    plot?.diskGb != null ? `${plot.diskGb} GB disk` : null,
+  ].filter((label): label is string => label !== null);
+  const substrate = plot?.kind === 'VM'
+    ? plot.host && `${plot.host}:${plot.sshPort}`
+    : plot?.runtime?.toLowerCase();
 
   return (
     <Box maxWidth={720}>
