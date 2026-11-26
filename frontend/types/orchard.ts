@@ -8,14 +8,28 @@ export type GroveState =
   | 'CLEARED'
   | 'BLIGHTED';
 
-export interface SeedlingInfo {
+export type PlotKind = 'VM' | 'CONTAINER';
+
+export type PlotState =
+  | 'GERMINATING'
+  | 'SPROUTING'
+  | 'ROOTED'
+  | 'WILTING'
+  | 'DORMANT'
+  | 'WITHERED'
+  | 'BLIGHTED';
+
+export interface PlotInfo {
+  kind: PlotKind;
   id: string;
-  state: string;
-  ipAddress: string | null;
-  sshPort: number;
-  cpuCores: number;
-  memoryMb: number;
-  diskGb: number;
+  state: PlotState;
+  providerId: string;
+  host: string | null;
+  sshPort: number | null;
+  cpuCores: number | null;
+  memoryMb: number | null;
+  diskGb: number | null;
+  runtime: 'DOCKER' | 'PODMAN' | null;
 }
 
 export interface FruitInfo {
@@ -34,7 +48,7 @@ export interface GroveResponse {
   commitSha: string | null;
   state: GroveState;
   sshConnectionString: string | null;
-  seedling: SeedlingInfo | null;
+  plot: PlotInfo | null;
   fruits: FruitInfo[];
   plantedAt: string;
   lastAccessedAt: string | null;

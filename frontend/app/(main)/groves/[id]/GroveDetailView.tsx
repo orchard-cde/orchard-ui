@@ -136,8 +136,12 @@ export default function GroveDetailView() {
     if (sseEvent) {
       setCurrentState(sseEvent.newState);
       setActionLoading(false);
+      if (sseEvent.newState === 'FLOURISHING') {
+        // The plot gains its host while provisioning; refresh the load-time snapshot.
+        getGrove(groveId).then(setGrove).catch(() => {});
+      }
     }
-  }, [sseEvent]);
+  }, [sseEvent, groveId]);
 
   useEffect(() => {
     if (isFlourishing) {
@@ -153,15 +157,18 @@ export default function GroveDetailView() {
     return () => clearTimeout(timer);
   }, [actionLoading]);
 
+  // FLOURISHING (live via SSE) implies a ROOTED plot, which is what ssh-config needs;
+  // grove.plot is a load-time snapshot and may predate the plot being rooted.
+  const sshReachable = isFlourishing && grove?.plot?.kind === 'VM';
+
   useEffect(() => {
-    const ipAddress = grove?.seedling?.ipAddress;
-    if (ipAddress && !sshFetched) {
+    if (sshReachable && !sshFetched) {
       setSshFetched(true);
       getSshConfig(groveId)
         .then(setSshConfig)
         .catch((e: ApiError) => setSshError(e.message));
     }
-  }, [grove?.seedling?.ipAddress, groveId, sshFetched]);
+  }, [sshReachable, groveId, sshFetched]);
 
   const handleStop = async () => {
     setActionLoading(true);
@@ -178,7 +185,15 @@ export default function GroveDetailView() {
   if (error) return <ErrorAlert message={error} />;
   if (!grove) return null;
 
-  const seedling = grove.seedling;
+  const plot = grove.plot;
+  const resourceChips = [
+    plot?.cpuCores != null ? `${plot.cpuCores} CPU` : null,
+    plot?.memoryMb != null ? `${Math.round(plot.memoryMb / 1024)} GB RAM` : null,
+    plot?.diskGb != null ? `${plot.diskGb} GB disk` : null,
+  ].filter((label): label is string => label !== null);
+  const substrate = plot?.kind === 'VM'
+    ? plot.host && `${plot.host}:${plot.sshPort}`
+    : plot?.runtime?.toLowerCase();
 
   return (
     <Box maxWidth={720}>
@@ -253,16 +268,22 @@ export default function GroveDetailView() {
         {grove.branch ? ` @ ${grove.branch}` : ''}
       </Typography>
 
-      {seedling && (
+      {resourceChips.length > 0 && (
         <>
           <Divider sx={{ my: 3 }} />
           <Typography variant="h6" gutterBottom>Resources</Typography>
           <Stack direction="row" spacing={1}>
-            <Chip label={`${seedling.cpuCores} CPU`} variant="outlined" />
-            <Chip label={`${Math.round(seedling.memoryMb / 1024)} GB RAM`} variant="outlined" />
-            <Chip label={`${seedling.diskGb} GB disk`} variant="outlined" />
+            {resourceChips.map((label) => (
+              <Chip key={label} label={label} variant="outlined" />
+            ))}
           </Stack>
         </>
+      )}
+
+      {substrate && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          {substrate}
+        </Typography>
       )}
 
       <Divider sx={{ my: 3 }} />
@@ -273,7 +294,9 @@ export default function GroveDetailView() {
       ) : (
         !sshError && (
           <Typography variant="body2" color="text.secondary">
-            Not ready yet — waiting for the seedling to provision.
+            {plot?.kind === 'CONTAINER'
+              ? 'Container groves are not reachable over SSH.'
+              : 'Not ready yet — waiting for the plot to provision.'}
           </Typography>
         )
       )}

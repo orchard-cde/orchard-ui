@@ -62,14 +62,17 @@ const mockGrove: GroveResponse = {
   commitSha: null,
   state: 'FLOURISHING',
   sshConnectionString: null,
-  seedling: {
-    id: 'seedling-1',
-    state: 'RUNNING',
-    ipAddress: '10.0.0.1',
+  plot: {
+    kind: 'VM',
+    id: 'plot-1',
+    state: 'ROOTED',
+    providerId: 'qemu-local',
+    host: '10.0.0.1',
     sshPort: 22,
     cpuCores: 2,
     memoryMb: 4096,
     diskGb: 50,
+    runtime: null,
   },
   fruits: [],
   plantedAt: '2024-06-01T00:00:00Z',
@@ -111,6 +114,98 @@ beforeEach(() => {
     capturedOnBeeRemoved = opts?.onBeeRemoved;
     return { event: null, error: null, connecting: false };
   });
+});
+
+test('a ROOTED VM plot drives the ssh-config fetch, size chips and host line', async () => {
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('ssh-ed25519 AAA...')).toBeInTheDocument();
+  });
+  expect(getSshConfig).toHaveBeenCalledWith('test-id');
+  expect(screen.getByText('2 CPU')).toBeInTheDocument();
+  expect(screen.getByText('4 GB RAM')).toBeInTheDocument();
+  expect(screen.getByText('50 GB disk')).toBeInTheDocument();
+  expect(screen.getByText('10.0.0.1:22')).toBeInTheDocument();
+});
+
+test('a GROWING grove does not fetch ssh-config even when its VM has a host', async () => {
+  (getGrove as jest.Mock).mockResolvedValue({
+    ...mockGrove,
+    state: 'GROWING',
+    plot: { ...mockGrove.plot, state: 'SPROUTING' },
+  });
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('Test Grove')).toBeInTheDocument();
+  });
+
+  expect(getSshConfig).not.toHaveBeenCalled();
+  expect(screen.getByText(/waiting for the plot to provision/)).toBeInTheDocument();
+});
+
+test('refetches the grove when SSE reports FLOURISHING so the plot snapshot catches up', async () => {
+  const growing = {
+    ...mockGrove,
+    state: 'GROWING',
+    plot: { ...mockGrove.plot, state: 'SPROUTING', host: null },
+  };
+  (getGrove as jest.Mock).mockResolvedValueOnce(growing);
+
+  const mockEvents = useGroveEvents as jest.Mock;
+  mockEvents.mockReturnValue({ event: null, error: null, connecting: false });
+
+  const { rerender } = render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('Test Grove')).toBeInTheDocument();
+  });
+  expect(screen.queryByText('10.0.0.1:22')).not.toBeInTheDocument();
+
+  mockEvents.mockReturnValue({
+    event: { newState: 'FLOURISHING', previousState: 'GROWING', changedAt: new Date().toISOString() },
+    error: null,
+    connecting: false,
+  });
+  rerender(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('10.0.0.1:22')).toBeInTheDocument();
+  });
+  expect(getGrove).toHaveBeenCalledTimes(2);
+  expect(getSshConfig).toHaveBeenCalledWith('test-id');
+});
+
+test('a CONTAINER plot never fetches ssh-config and shows no disk chip', async () => {
+  (getGrove as jest.Mock).mockResolvedValue({
+    ...mockGrove,
+    plot: {
+      kind: 'CONTAINER',
+      id: 'plot-2',
+      state: 'ROOTED',
+      providerId: 'container-local',
+      host: null,
+      sshPort: null,
+      cpuCores: 2,
+      memoryMb: 4096,
+      diskGb: null,
+      runtime: 'DOCKER',
+    },
+  });
+
+  render(<GroveDetailView />);
+
+  await waitFor(() => {
+    expect(screen.getByText('Test Grove')).toBeInTheDocument();
+  });
+
+  expect(getSshConfig).not.toHaveBeenCalled();
+  expect(screen.getByText(/Container groves are not reachable over SSH/)).toBeInTheDocument();
+  expect(screen.getByText('2 CPU')).toBeInTheDocument();
+  expect(screen.queryByText(/GB disk/)).not.toBeInTheDocument();
+  expect(screen.getByText('docker')).toBeInTheDocument();
 });
 
 test('shows inline error when stop fails instead of replacing the entire view', async () => {
