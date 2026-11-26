@@ -49,35 +49,28 @@ const SIZE_SX: Record<ButtonSize, SxProps<Theme>> = {
   lg: { minHeight: 48, fontSize: fontSize.lg.value },
 };
 
-function variantSx(variant: ButtonVariant): SxProps<Theme> {
-  return (theme) => {
-    const base = {
-      textTransform: 'none' as const,
-      // focus-visible: 2px orchard-400 ring
-      '&.Mui-focusVisible': {
-        outline: `2px solid ${theme.palette.orchard['400']}`,
-        outlineOffset: 2,
-      },
-    };
-    switch (variant) {
-      case 'primary':
-        // hover orchard-700 (spec) rather than MUI's default darken
-        return {
-          ...base,
-          '&:hover': { backgroundColor: theme.palette.orchard['700'] },
-        };
-      case 'ghost':
-        // hover orchard-50 background
-        return {
-          ...base,
-          '&:hover': { backgroundColor: theme.palette.orchard['50'] },
-        };
-      default:
-        // secondary + danger keep MUI defaults
-        return base;
-    }
-  };
-}
+// Hover and focus colors mix the primary token toward the foreground token, so
+// they step darker in light mode and lighter in dark mode without a per-mode
+// selector. Fixed orchard steps would stay light-tuned under data-theme="dark".
+const PRIMARY_HOVER = 'color-mix(in srgb, var(--color-primary), var(--color-foreground) 15%)';
+const GHOST_HOVER = 'rgb(var(--color-primary-rgb) / 0.08)';
+const FOCUS_RING = 'color-mix(in srgb, var(--color-primary), var(--color-foreground) 40%)';
+
+const BASE_SX = {
+  textTransform: 'none' as const,
+  '&.Mui-focusVisible': {
+    outline: `2px solid ${FOCUS_RING}`,
+    outlineOffset: 2,
+  },
+};
+
+const VARIANT_SX: Record<ButtonVariant, SxProps<Theme>> = {
+  primary: { ...BASE_SX, '&:hover': { backgroundColor: PRIMARY_HOVER } },
+  ghost: { ...BASE_SX, '&:hover': { backgroundColor: GHOST_HOVER } },
+  // secondary + danger keep MUI defaults
+  secondary: BASE_SX,
+  danger: BASE_SX,
+};
 
 export default function Button({
   variant = 'primary',
@@ -92,7 +85,7 @@ export default function Button({
       size={MUI_SIZE[size]}
       sx={[
         SIZE_SX[size],
-        variantSx(variant),
+        VARIANT_SX[variant],
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
       ]}
       {...rest}
