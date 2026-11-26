@@ -62,10 +62,13 @@ export interface CultivatorResponse {
   avatarUrl: string | null;
 }
 
+export type MachineSize = 'small' | 'medium' | 'large';
+
 export interface CreateGroveRequest {
   name: string;
   repositoryUrl: string;
   branch?: string;
+  machineSize?: MachineSize;
 }
 
 export interface ApiError {

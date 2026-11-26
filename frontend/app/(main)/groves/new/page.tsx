@@ -5,17 +5,25 @@ import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import ErrorAlert from '@/components/common/ErrorAlert';
 import { plantGrove } from '@/lib/api/groves';
-import type { ApiError } from '@/types/orchard';
+import type { ApiError, MachineSize } from '@/types/orchard';
+
+const MACHINE_SIZES: { value: MachineSize; label: string }[] = [
+  { value: 'small', label: 'Small' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'large', label: 'Large' },
+];
 
 export default function PlantGrovePage() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [repositoryUrl, setRepositoryUrl] = useState('');
   const [branch, setBranch] = useState('');
+  const [machineSize, setMachineSize] = useState<MachineSize>('small');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +36,7 @@ export default function PlantGrovePage() {
         name,
         repositoryUrl,
         ...(branch ? { branch } : {}),
+        ...(machineSize !== 'small' ? { machineSize } : {}),
       });
       router.push(`/groves/${grove.id}`);
     } catch (e) {
@@ -69,6 +78,20 @@ export default function PlantGrovePage() {
             disabled={submitting}
             placeholder="main (leave blank for repo default)"
           />
+          <TextField
+            select
+            label="Machine size"
+            value={machineSize}
+            onChange={(e) => setMachineSize(e.target.value as MachineSize)}
+            fullWidth
+            disabled={submitting}
+          >
+            {MACHINE_SIZES.map((size) => (
+              <MenuItem key={size.value} value={size.value}>
+                {size.label}
+              </MenuItem>
+            ))}
+          </TextField>
           <Button
             type="submit"
             variant="contained"
